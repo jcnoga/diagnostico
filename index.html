@@ -43,6 +43,30 @@
             display: flex;
             flex-direction: column;
         }
+		
+		<!--  // AQUI -->
+		<script>
+    // Verifica se está rodando via arquivo local (file://)
+    if (window.location.protocol === 'file:') {
+        // Pára o carregamento e exibe mensagem de erro
+        document.body.innerHTML = `
+            <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
+                <div>
+                    <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
+                    <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e conexão com o Firebase, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
+                    <hr style="border-color:#555; margin:20px 0;">
+                    <p><strong>Como resolver:</strong></p>
+                    <p>Utilize um servidor local (ex: VS Code Live Server, XAMPP, Python http.server)<br>ou hospede a aplicação na web.</p>
+                    <p style="color:#f1c40f; margin-top:15px;">O endereço deve começar com <strong>http://</strong> ou <strong>https://</strong></p>
+                </div>
+            </div>
+        `;
+        // Lança um erro para parar a execução do restante dos scripts
+        throw new Error("Execução via file:// bloqueada por segurança.");
+    }
+   </script>
+   
+<!--  // AQUI não permite rodar o html-->
 
         /* --- AUTH SCREEN STYLES --- */
         #authScreen {
