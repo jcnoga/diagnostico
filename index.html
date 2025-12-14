@@ -2093,125 +2093,121 @@ const firebaseConfig = {
         }
 
         // --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
-        async function generateAdvice() {
-            showLoading();
-            
-            // Leitura integral dos dados (simulação de processamento)
-            await new Promise(r => setTimeout(r, 1500)); 
-            
-            const data = currentUser.diagnosisData || {};
-            const nomeEmpresa = data.empresa_nome || "Sua Empresa";
-            const segmento = (data.empresa_segmento || "").toLowerCase();
-            const faturamento = parseFloat(data.empresa_faturamento || 0);
-            
-            // Identificadores de contexto
-            const isVarejo = ["varejo", "loja", "comércio", "venda", "produto", "roupas", "moda", "mercado"].some(k => segmento.includes(k));
-            const isB2C = (data.empresa_publico === "B2C" || data.empresa_publico === "Hibrido");
-            
-            const adviceHeader = document.querySelector('#adviceSection h2');
-            adviceHeader.innerText = "Plano de Ação Estratégico (Consultor IA)";
+ // --- INTEGRAÇÃO COM DEEPSEEK API ---
+async function generateAdvice() {
+    // 1. CONFIGURAÇÃO
+    const DEEPSEEK_API_KEY = "sk-2ee0f3e891bd4e58ad2f14475b739f25"; // <--- COLE SUA CHAVE AQUI
+    const API_URL = "https://api.deepseek.com/chat/completions";
 
-            let html = `<div class="advice-intro">
-                <strong>Análise para: ${nomeEmpresa}</strong><br>
-                Com base na leitura integral do seu diagnóstico, preparamos as seguintes recomendações profissionais, focadas em eficiência e crescimento.
-            </div>`;
+    showLoading();
+    
+    // 2. PREPARAÇÃO DOS DADOS (Contexto para a IA)
+    const data = currentUser.diagnosisData || {};
+    
+    // Monta um texto legível com todos os dados para a IA ler
+    let contextoEmpresa = `
+        Nome: ${data.empresa_nome || "Não informado"}
+        Segmento: ${data.empresa_segmento || "Não informado"}
+        Tempo de mercado: ${data.empresa_tempo || "0"} anos
+        Funcionários: ${data.empresa_funcionarios || "0"}
+        Faturamento Mensal: R$ ${data.empresa_faturamento || "0"}
+        Regime: ${data.empresa_regime || "Não informado"}
+        Público: ${data.empresa_publico || "Não informado"}
+        Controle Financeiro: ${data.fin_controle || "Não informado"}
+        Custos Fixos: R$ ${data.fin_custos_fixos || "0"}
+        Dívidas: ${data.fin_dividas || "Não possui"}
+        Marketing/Ads: Investe? ${data.ads_investe || "Não"}. Valor: R$ ${data.ads_valor || "0"}
+        Problema Principal relatado: ${data.obj_problemas || "Não informado"}
+        Objetivo: ${data.obj_principal || "Não informado"}
+    `;
 
-            // ---------------------------------------------------------
-            // 1. OTIMIZAÇÃO E CORTE DE CUSTOS (PRIORIDADE 1)
-            // ---------------------------------------------------------
-            let costsAdvice = `<h4>1. Saneamento Financeiro e Redução de Custos</h4>
-            <p style="margin-bottom:10px;">Antes de buscar novas receitas, é crucial estancar vazamentos financeiros.</p>
-            <ul>`;
-            
-            // Assinaturas e Recorrentes
-            costsAdvice += `<li><strong>Auditoria de Assinaturas (SaaS/Serviços):</strong> Revise imediatamente extratos de cartão corporativo. Cancele softwares duplicados ou subutilizados.</li>`;
-            
-            // Telefonia/Internet
-            costsAdvice += `<li><strong>Renegociação de Contratos (Telecom):</strong> Se seus contratos de internet e telefonia têm mais de 12 meses, solicite cotação na concorrência e exija redução na operadora atual. A economia média é de 20%.</li>`;
-            
-            // Eficiência Operacional
-            costsAdvice += `<li><strong>Eficiência Operacional:</strong> Implemente política de "Desperdício Zero". Troque iluminação por LED (se loja física) e instale sensores de presença em áreas comuns.</li>`;
-            
-            // Controle Financeiro Específico
-            if(data.fin_controle !== "Sim") {
-                costsAdvice += `<li><b style="color:#e74c3c">Ação Crítica:</b> Implemente um DRE (Demonstrativo de Resultado) gerencial imediatamente. Sem saber exatamente para onde vai cada centavo, qualquer estratégia de venda é arriscada.</li>`;
-            }
-            
-            // Dívidas
-            if(data.fin_dividas && data.fin_dividas.length > 5) {
-                costsAdvice += `<li><strong>Gestão de Passivos:</strong> Priorize a renegociação das dívidas citadas (${data.fin_dividas.substring(0, 30)}...). Troque dívidas caras (cheque especial/cartão) por crédito com garantia (imóvel/veículo) que possui juros menores.</li>`;
-            }
-            
-            costsAdvice += `</ul>`;
-            html += `<div class="advice-card">${costsAdvice}</div>`;
+    // 3. CRIAÇÃO DO PROMPT (As instruções para a IA)
+    const prompt = `
+        Você é um consultor empresarial sênior especializado em reestruturação financeira e crescimento.
+        Analise os dados da seguinte empresa:
+        ${contextoEmpresa}
 
-            // ---------------------------------------------------------
-            // 2. ESTRATÉGIA DIGITAL E POSICIONAMENTO (MERCADO ATUAL)
-            // ---------------------------------------------------------
-            let digitalAdvice = `<h4>2. Estratégia Digital 360º</h4><ul>`;
+        Gere um "Plano de Ação Estratégico" profissional, direto e prático.
+        
+        REGRAS DE FORMATAÇÃO:
+        - A resposta DEVE ser estritamente em formato HTML (sem tag <html>, <head> ou <body>, apenas o conteúdo interno como <div>, <h4>, <ul>, <li>, <p>).
+        - Use a classe "advice-card" para agrupar blocos (ex: <div class="advice-card">...</div>).
+        - Não use Markdown (nada de ** ou ##), use tags HTML (<b>, <h4>).
 
-            // Redes Sociais
-            digitalAdvice += `<li><strong>Instagram e Facebook:</strong> Não utilize apenas como vitrine de fotos estáticas. O algoritmo atual prioriza vídeos curtos (Reels). Humanize a marca mostrando bastidores e "quem faz". A constância sugerida é de 1 post no feed e 5 a 10 stories diários.</li>`;
-            
-            // Google Meu Negócio
-            if(data.seo_gmn !== "Sim") {
-                digitalAdvice += `<li><strong>Google Meu Negócio (Urgente):</strong> Sua empresa precisa aparecer no mapa. É tráfego gratuito e qualificado. Cadastre-se, adicione fotos reais e peça avaliações para os melhores clientes.</li>`;
-            } else {
-                digitalAdvice += `<li><strong>Otimização Google Maps:</strong> Responda a todas as avaliações (boas ou ruins) em até 24h. Adicione fotos novas semanalmente para manter relevância no topo das buscas locais.</li>`;
-            }
+        ESTRUTURA OBRIGATÓRIA DA RESPOSTA:
+        1. Resumo da Situação: Uma análise breve de 2 linhas sobre o momento da empresa.
+        2. Saneamento Financeiro (Foco em Cortes):
+           - Sugira cortes de custos específicos (assinaturas, energia, telefonia) e renegociações baseadas no porte da empresa.
+           - Se não tiver controle financeiro, enfatize a urgência do DRE.
+        3. Estratégia Digital & Vendas:
+           - Ações para Instagram/Facebook/Google Meu Negócio.
+           - Otimização de conversão (Landing Pages, Site).
+           - Tráfego Pago vs Orgânico (recomende com base no faturamento atual).
+        4. Oportunidade de Importação/Sourcing:
+           - Se for comércio/varejo, analise se vale a pena importar da China ou buscar fornecedores diretos. Se for serviço, ignore este ponto.
+    `;
 
-            // Site e Landing Pages
-            if(data.site_possui === "Nao") {
-                digitalAdvice += `<li><strong>Landing Pages:</strong> Mesmo sem um site complexo, crie Landing Pages (Páginas de Venda Única) para suas promoções específicas. Isso aumenta a conversão de campanhas pagas drasticamente em comparação a mandar o cliente para o WhatsApp direto.</li>`;
-            } else {
-                digitalAdvice += `<li><strong>Experiência do Site:</strong> Verifique a velocidade de carregamento mobile. Se demorar mais de 3 segundos, você está perdendo até 40% do tráfego pago.</li>`;
-            }
+    try {
+        const adviceContent = document.getElementById("adviceContent");
+        const adviceHeader = document.querySelector('#adviceSection h2');
+        
+        adviceHeader.innerText = "Gerando Análise com IA...";
+        
+        // 4. CHAMADA À API (FETCH)
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat", // Modelo V3 (Rápido e Inteligente)
+                messages: [
+                    { 
+                        role: "system", 
+                        content: "Você é um assistente especialista em consultoria empresarial que responde exclusivamente em HTML formatado para web." 
+                    },
+                    { 
+                        role: "user", 
+                        content: prompt 
+                    }
+                ],
+                temperature: 0.7, // Criatividade equilibrada
+                max_tokens: 1500  // Limite de tamanho da resposta
+            })
+        });
 
-            // Marketplaces
-            if(isVarejo) {
-                if(data.mktp_vende === "Nao") {
-                    digitalAdvice += `<li><strong>Diversificação em Marketplaces:</strong> Inicie operação no Mercado Livre ou Shopee. Eles possuem tráfego próprio gigantesco. Use-os como canal de aquisição de cliente (primeira venda) e tente fidelizar para venda direta depois.</li>`;
-                } else {
-                    digitalAdvice += `<li><strong>Expansão de Canais:</strong> Se já vende em um marketplace, espelhe o estoque para outros (ex: Amazon, Magalu) usando um ERP integrador (hub), diluindo o risco de bloqueio de conta.</li>`;
-                }
-            }
-
-            // Tráfego Pago vs Orgânico
-            if(data.ads_investe === "Nao") {
-                digitalAdvice += `<li><strong>Tráfego Pago (Ads):</strong> O alcance orgânico está morrendo. Separe uma verba de teste (ex: R$ 300-500) para Google Ads (fundo de funil/quem já busca o produto) ou Meta Ads (geração de desejo).</li>`;
-            } else {
-                digitalAdvice += `<li><strong>Otimização de ROI:</strong> Como já investe, foque em Remarketing (mostrar anúncio para quem visitou o site mas não comprou). É o custo por conversão mais barato disponível.</li>`;
-            }
-            
-            digitalAdvice += `</ul>`;
-            html += `<div class="advice-card">${digitalAdvice}</div>`;
-
-            // ---------------------------------------------------------
-            // 3. SOURCING E IMPORTAÇÃO (SE APLICÁVEL)
-            // ---------------------------------------------------------
-            // Lógica: Sugerir apenas se for comércio/varejo e tiver faturamento relevante ou perfil B2C
-            if(isVarejo && isB2C) {
-                let chinaAdvice = `<h4>3. Estratégia de Suprimentos (Importação)</h4><ul>`;
-                chinaAdvice += `<li><strong>Importação Direta da China:</strong> Dado o seu segmento (${segmento}), existe alta oportunidade de margem na importação direta.</li>`;
-                
-                if(faturamento > 50000) {
-                    chinaAdvice += `<li><strong>Importação Simplificada:</strong> Com seu faturamento, avalie utilizar empresas de "Trading" para importar pequenos lotes (até US$ 3.000) via Remessa Expressa para testar novos produtos com marca própria (Private Label) antes de grandes investimentos.</li>`;
-                } else {
-                    chinaAdvice += `<li><strong>Sourcing via Alibaba/AliExpress:</strong> Comece validando produtos comprando unitariamente para revenda (dropshipping nacional ou estoque mínimo) para validar a aceitação do público antes de comprar em atacado.</li>`;
-                }
-                
-                chinaAdvice += `<li><strong>Precificação na Importação:</strong> Lembre-se de calcular o custo nacionalizado (Preço + Frete + Imposto 60% + ICMS) para garantir que a margem final seja superior à compra local.</li>`;
-                chinaAdvice += `</ul>`;
-                html += `<div class="advice-card">${chinaAdvice}</div>`;
-            }
-
-            // Atualiza HTML e rola
-            document.getElementById("adviceContent").innerHTML = html;
-            hideLoading();
-            document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error?.message || "Erro na API DeepSeek");
         }
 
-        // --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
+        const json = await response.json();
+        const aiResponseHTML = json.choices[0].message.content;
+
+        // 5. EXIBIÇÃO DO RESULTADO
+        // Remove marcadores de código se a IA mandar (```html ... ```)
+        const cleanHTML = aiResponseHTML.replace(/```html/g, '').replace(/```/g, '');
+
+        adviceHeader.innerText = "Plano de Ação Estratégico (DeepSeek AI)";
+        adviceContent.innerHTML = `<div class="advice-intro">Análise gerada em tempo real baseada nos seus dados.</div>` + cleanHTML;
+        
+        // Rola a tela até o conselho
+        document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        console.error("Erro na IA:", error);
+        alert("Falha ao gerar conselho com IA: " + error.message);
+        document.getElementById("adviceContent").innerHTML = `<p style="color:red">Erro ao conectar com o consultor virtual. Verifique sua chave API ou conexão.</p>`;
+    } finally {
+        hideLoading();
+    }
+}
+        
+		
+		
+		
+		// --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
         function backupData() {
             if(!currentUser) return;
             // Cria arquivo JSON com os dados atuais do usuário
