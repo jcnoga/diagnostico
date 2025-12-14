@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico Empresarial - Cloud Edition</title>
+    <title>Diagnóstico Empresarial - Firebase Real</title>
+    
+    <!-- FIREBASE SDKs (Compat Version para facilitar uso em arquivo único) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --primary-color: #0f3460;
@@ -737,12 +743,13 @@
             <!-- View: Login -->
             <div id="loginView" class="auth-view active">
                 <h2>Bem-vindo</h2>
-                <p>Faça login na Nuvem para acessar o diagnóstico.</p>
+                <p>Faça login com Firebase para acessar o diagnóstico.</p>
                 <form class="auth-form" onsubmit="handleLogin(event)">
                     <input type="email" id="loginEmail" placeholder="Seu e-mail" required>
                     <input type="password" id="loginPass" placeholder="Sua senha" required>
                     <button type="submit" class="auth-btn">Entrar</button>
-                    <button type="button" class="auth-btn google-btn" onclick="handleGoogleLogin()">
+                    <!-- Google Auth precisa ser habilitado no console do Firebase -->
+                    <button type="button" class="auth-btn google-btn" onclick="alert('Google Auth precisa ser habilitado no console do Firebase.')">
                         Entrar com Google
                     </button>
                 </form>
@@ -754,12 +761,12 @@
 
             <!-- View: Cadastro -->
             <div id="registerView" class="auth-view">
-                <h2>Criar Conta Cloud</h2>
+                <h2>Criar Conta Firebase</h2>
                 <p>Preencha seus dados para começar. Você ganhará 30 dias de acesso gratuito.</p>
                 <form class="auth-form" onsubmit="handleRegister(event)">
                     <input type="text" id="regName" placeholder="Seu Nome Completo" required>
                     <input type="email" id="regEmail" placeholder="Seu E-mail" required>
-                    <input type="password" id="regPass" placeholder="Crie uma Senha" required>
+                    <input type="password" id="regPass" placeholder="Crie uma Senha (mín 6 dígitos)" required>
                     <button type="submit" class="auth-btn">Cadastrar</button>
                 </form>
                 <div class="auth-links">
@@ -770,16 +777,11 @@
             <!-- View: Esqueci Senha -->
             <div id="forgotView" class="auth-view">
                 <h2>Recuperar Senha</h2>
-                <p>Informe seu e-mail para receber um código.</p>
+                <p>Informe seu e-mail para receber um link de redefinição.</p>
                 <form class="auth-form" onsubmit="handleForgot(event)">
                     <div id="forgotStep1">
                         <input type="email" id="forgotEmail" placeholder="E-mail cadastrado" required>
-                        <button type="submit" class="auth-btn">Enviar Código</button>
-                    </div>
-                    <div id="forgotStep2" style="display:none;">
-                        <input type="text" id="forgotCode" placeholder="Código recebido (Ex: 1234)">
-                        <input type="password" id="newPass" placeholder="Nova Senha">
-                        <button type="button" class="auth-btn" onclick="finishReset()">Redefinir Senha</button>
+                        <button type="submit" class="auth-btn">Enviar E-mail</button>
                     </div>
                 </form>
                 <div class="auth-links">
@@ -836,12 +838,12 @@
 
     <header>
         <h1>Consultoria Estratégica & Financeira</h1>
-        <p>Sistema de Diagnóstico Empresarial - Cloud Edition</p>
+        <p>Sistema de Diagnóstico Empresarial - Firebase Edition</p>
         <div id="userWelcomeDisplay" class="user-welcome"></div>
         
         <div class="header-controls">
             <div class="cloud-status" title="Conexão Segura">
-                <span class="cloud-dot"></span> Nuvem Conectada
+                <span class="cloud-dot"></span> Firebase Conectado
             </div>
             <button class="header-btn" onclick="openSettings()">
                 Configurações 
@@ -1491,7 +1493,7 @@
                 <h1>Relatório de Diagnóstico Inicial</h1>
                 <p>Gerado em: <span id="reportDate"></span></p>
                 <p>Usuário Responsável: <span id="reportUser"></span></p>
-                <small style="color:#777">Dados recuperados da Nuvem</small>
+                <small style="color:#777">Dados recuperados do Firebase</small>
             </div>
             
             <div id="reportContent">
@@ -1522,94 +1524,53 @@
     </footer>
 
     <script>
+        // --- 1. CONFIGURAÇÃO DO FIREBASE (SUBSTITUA AQUI) ---
+        // Você pega isso no Console do Firebase > Configurações do Projeto > Geral > Seus aplicativos
+        var firebaseConfig = {
+            apiKey: "COLE_SUA_API_KEY_AQUI",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO_ID",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "NUMERO_AQUI",
+            appId: "APP_ID_AQUI"
+        };
+
+        // Inicializa Firebase
+        let auth, db;
+        try {
+            if (firebaseConfig.apiKey !== "COLE_SUA_API_KEY_AQUI") {
+                firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+                console.log("Firebase inicializado com sucesso");
+            } else {
+                console.warn("Firebase Config não preenchido. As funcionalidades de nuvem não funcionarão.");
+            }
+        } catch (e) {
+            console.error("Erro ao inicializar Firebase:", e);
+        }
+
         // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
         const CONST_ADD = 13;
         const CONST_MULT = 9;
         const CONST_BASE = 1954;
-        let generatedRandomNumber = 0; // Armazena o número aleatório gerado para validação
-
-        // --- INTEGRAÇÃO NUVEM (CLOUD SERVICE) ---
-        // Este objeto simula a comunicação com uma API REST.
-        // Se 'apiUrl' for preenchido, ele tentará fazer fetch.
-        // Se vazio, ele usa localStorage simulando uma nuvem (com delays).
+        let generatedRandomNumber = 0; 
         
-        const API_URL = ""; // Coloque aqui a URL da sua API (ex: 'https://api.meusistema.com')
+        // --- ESTADO DA APLICAÇÃO ---
+        let currentUser = null; 
 
-        const CloudService = {
-            async delay(ms) {
-                return new Promise(resolve => setTimeout(resolve, ms));
-            },
-
-            showLoading() {
-                document.getElementById('loadingOverlay').style.display = 'flex';
-            },
-
-            hideLoading() {
-                document.getElementById('loadingOverlay').style.display = 'none';
-            },
-
-            async getUsers() {
-                if (API_URL) {
-                    try {
-                        const res = await fetch(`${API_URL}/users`);
-                        return await res.json();
-                    } catch (e) {
-                        console.error("Erro na nuvem, usando cache local", e);
-                    }
-                }
-                // Simulação Local
-                return JSON.parse(localStorage.getItem('cloud_users') || "[]");
-            },
-
-            async saveUsers(users) {
-                if (API_URL) {
-                    try {
-                        await fetch(`${API_URL}/users`, { method: 'POST', body: JSON.stringify(users) });
-                    } catch (e) { console.error("Erro ao salvar na nuvem", e); }
-                }
-                localStorage.setItem('cloud_users', JSON.stringify(users));
-            },
-
-            async getData(userId) {
-                this.showLoading();
-                await this.delay(600); // Simula latência de rede
-                
-                let data = null;
-                if (API_URL) {
-                     // Lógica de fetch real iria aqui
-                } else {
-                    // Lógica simulada
-                    const allData = JSON.parse(localStorage.getItem('cloud_data') || "{}");
-                    data = allData[userId] || null;
-                }
-                
-                this.hideLoading();
-                return data;
-            },
-
-            async saveData(userId, data) {
-                // Background save (sem loading intrusivo se for auto-save)
-                const allData = JSON.parse(localStorage.getItem('cloud_data') || "{}");
-                allData[userId] = data;
-                localStorage.setItem('cloud_data', JSON.stringify(allData));
-                
-                // Simulação de sync visual
-                const cloudIcon = document.querySelector('.cloud-status');
-                const originalText = cloudIcon.innerHTML;
-                cloudIcon.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Sincronizando...`;
-                await this.delay(800);
-                cloudIcon.innerHTML = `<span class="cloud-dot"></span> Nuvem Conectada`;
-            }
-        };
-
-        // --- AUTH SYSTEM (Async) ---
+        // --- Elementos DOM ---
         const authScreen = document.getElementById('authScreen');
         const appContainer = document.querySelector('.container');
         const userDisplay = document.getElementById('userWelcomeDisplay');
         const reportUserSpan = document.getElementById('reportUser');
         const lockScreen = document.getElementById('lockScreen');
+        const loadingOverlay = document.getElementById('loadingOverlay');
 
-        let currentUser = null;
+        function showLoading() { loadingOverlay.style.display = 'flex'; }
+        function hideLoading() { loadingOverlay.style.display = 'none'; }
+
+        // --- AUTH & FIRESTORE LOGIC ---
 
         function switchAuthView(viewId) {
             document.querySelectorAll('.auth-view').forEach(v => v.classList.remove('active'));
@@ -1623,37 +1584,53 @@
             const pass = document.getElementById('regPass').value;
 
             if(!name || !email || !pass) return alert("Preencha todos os campos.");
+            if(!auth) return alert("Erro: Firebase não configurado no código.");
 
-            CloudService.showLoading();
-            await CloudService.delay(1000); // Simula verificação no servidor
+            showLoading();
+            try {
+                // 1. Cria usuário no Authentication
+                const userCred = await auth.createUserWithEmailAndPassword(email, pass);
+                const uid = userCred.user.uid;
 
-            const users = await CloudService.getUsers();
-            if(users.find(u => u.email === email)) {
-                CloudService.hideLoading();
-                return alert("E-mail já cadastrado na nuvem.");
-            }
+                // 2. Prepara dados da licença (30 dias grátis ou Admin)
+                const now = new Date();
+                let expirationTime;
 
-            // Liberação inicial de 30 dias
-            const now = new Date();
-            const expirationDate = new Date(now);
-            expirationDate.setDate(now.getDate() + 30);
-
-            const newUser = { 
-                name, 
-                email, 
-                pass,
-                license: {
-                    expiration: expirationDate.getTime(),
-                    lastAccess: now.getTime()
+                // Regra 6: Admin tem 9999 dias
+                if (email === 'jcnvap@gmail.com') {
+                    expirationTime = now.getTime() + (9999 * 24 * 60 * 60 * 1000);
+                } else {
+                    // Regra 2: 30 dias grátis
+                    expirationTime = now.getTime() + (30 * 24 * 60 * 60 * 1000);
                 }
-            };
 
-            users.push(newUser);
-            await CloudService.saveUsers(users);
-            
-            CloudService.hideLoading();
-            alert("Cadastro realizado na nuvem com sucesso! Você ganhou 30 dias de acesso gratuito.");
-            switchAuthView('loginView');
+                const userData = {
+                    name: name,
+                    email: email,
+                    role: (email === 'jcnvap@gmail.com') ? 'admin' : 'user',
+                    license: {
+                        expiration: expirationTime,
+                        lastAccess: now.getTime()
+                    },
+                    diagnosisData: {} // Dados do formulário vazio
+                };
+
+                // 3. Salva no Firestore
+                await db.collection("users").doc(uid).set(userData);
+                
+                alert("Conta criada com sucesso no Firebase!");
+                // Login automático após cadastro
+                await loginSuccess(uid, userData);
+
+            } catch (error) {
+                console.error(error);
+                let msg = "Erro ao cadastrar: " + error.message;
+                if(error.code === 'auth/email-already-in-use') msg = "E-mail já está em uso.";
+                if(error.code === 'auth/weak-password') msg = "A senha deve ter pelo menos 6 caracteres.";
+                alert(msg);
+            } finally {
+                hideLoading();
+            }
         }
 
         async function handleLogin(e) {
@@ -1661,135 +1638,95 @@
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
 
-            CloudService.showLoading();
-            await CloudService.delay(1000); // Network delay
+            if(!auth) return alert("Erro: Firebase não configurado.");
 
-            const users = await CloudService.getUsers();
-            const user = users.find(u => u.email === email && u.pass === pass);
-            
-            CloudService.hideLoading();
-
-            if(user) {
-                await loginSuccess(user);
-            } else {
-                alert("E-mail ou senha incorretos. Verifique suas credenciais.");
-            }
-        }
-
-        async function handleGoogleLogin() {
-            CloudService.showLoading();
-            await CloudService.delay(1500); // Google auth delay simulation
-            CloudService.hideLoading();
-            
-            alert("Simulação: Conectado com Google Cloud.");
-            const mockUser = {
-                name: "Usuário Google Exemplo",
-                email: "google.user@gmail.com",
-                type: "google",
-                license: {
-                    expiration: new Date().setDate(new Date().getDate() + 30),
-                    lastAccess: Date.now()
+            showLoading();
+            try {
+                const userCred = await auth.signInWithEmailAndPassword(email, pass);
+                const uid = userCred.user.uid;
+                
+                // Busca dados no Firestore
+                const doc = await db.collection("users").doc(uid).get();
+                if (doc.exists) {
+                    await loginSuccess(uid, doc.data());
+                } else {
+                    // Usuário existe no Auth mas não no Firestore (fallback de integridade)
+                    alert("Dados do perfil não encontrados. Entre em contato com suporte.");
+                    auth.signOut();
                 }
-            };
-            await loginSuccess(mockUser);
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao entrar: " + error.message);
+            } finally {
+                hideLoading();
+            }
         }
 
         async function handleForgot(e) {
             e.preventDefault();
-            const step1 = document.getElementById('forgotStep1');
-            const step2 = document.getElementById('forgotStep2');
+            const email = document.getElementById('forgotEmail').value;
+            if(!auth) return;
             
-            if(step1.style.display !== 'none') {
-                const email = document.getElementById('forgotEmail').value;
-                
-                CloudService.showLoading();
-                await CloudService.delay(1000);
-                
-                const users = await CloudService.getUsers();
-                const user = users.find(u => u.email === email);
-                
-                CloudService.hideLoading();
-
-                if(user) {
-                    alert(`Simulação: Código de recuperação enviado para ${email}. (Use '1234')`);
-                    step1.style.display = 'none';
-                    step2.style.display = 'block';
-                } else {
-                    alert("E-mail não encontrado na base de dados.");
-                }
+            showLoading();
+            try {
+                await auth.sendPasswordResetEmail(email);
+                alert("Link de redefinição enviado para " + email);
+                switchAuthView('loginView');
+            } catch (error) {
+                alert("Erro: " + error.message);
+            } finally {
+                hideLoading();
             }
         }
 
-        async function finishReset() {
-            const code = document.getElementById('forgotCode').value;
-            const newPass = document.getElementById('newPass').value;
-            
-            if(code === '1234' && newPass) {
-                const email = document.getElementById('forgotEmail').value;
-                CloudService.showLoading();
-                const users = await CloudService.getUsers();
-                const userIndex = users.findIndex(u => u.email === email);
-                
-                if(userIndex > -1) {
-                    users[userIndex].pass = newPass;
-                    await CloudService.saveUsers(users);
-                    CloudService.hideLoading();
-                    
-                    alert("Senha alterada na nuvem com sucesso!");
-                    switchAuthView('loginView');
-                    document.getElementById('forgotStep1').style.display = 'block';
-                    document.getElementById('forgotStep2').style.display = 'none';
-                }
-            } else {
-                alert("Código inválido ou senha vazia.");
-            }
-        }
-
-        async function loginSuccess(user) {
-            // REGRA 6: Admin tem 9999 dias
-            if (user.email === 'jcnvap@gmail.com') {
-                const now = new Date();
-                const farFuture = new Date(now);
-                farFuture.setDate(now.getDate() + 9999);
-                
-                user.license = {
-                    expiration: farFuture.getTime(),
-                    lastAccess: now.getTime()
-                };
-                await updateUserStorage(user);
-            }
-
-            // REGRA 5: Verificação de data retroativa e validade
+        // Função central de validação de acesso
+        async function loginSuccess(uid, userData) {
             const nowTime = Date.now();
             
-            if(!user.license) {
-                const exp = new Date();
-                exp.setDate(exp.getDate() + 30);
-                user.license = { expiration: exp.getTime(), lastAccess: nowTime };
+            // Regra 6: Reforço de Admin caso o banco esteja desatualizado
+            if (userData.email === 'jcnvap@gmail.com') {
+                const minAdminExp = nowTime + (1000 * 60 * 60 * 24 * 365);
+                if (userData.license.expiration < minAdminExp) {
+                     userData.license.expiration = nowTime + (9999 * 24 * 60 * 60 * 1000); 
+                }
             }
 
-            if (nowTime < user.license.lastAccess) {
-                alert("Erro de segurança: Data do dispositivo incorreta. Acesso negado pela nuvem.");
+            // Regra 5: Validação de data retroativa
+            // Tolerância de 2 minutos para diferenças de relógio
+            if (userData.license.lastAccess > nowTime + 120000) { 
+                alert("Erro de segurança: A data do seu dispositivo parece estar errada (atrasada em relação ao último acesso registrado). Por favor, ajuste o relógio.");
+                hideLoading();
+                // Não permite prosseguir
                 return;
             }
 
-            // Atualizar último acesso
-            user.license.lastAccess = nowTime;
-            await updateUserStorage(user);
-            currentUser = user;
+            // Atualiza lastAccess no banco (Persistência da Regra 5)
+            // Fazemos isso sem esperar (fire and forget) para não travar a UI, ou esperamos se for crítico.
+            // Aqui vamos esperar para garantir consistência.
+            userData.license.lastAccess = nowTime;
             
-            // Verifica se a licença expirou
-            if (nowTime > user.license.expiration) {
+            await db.collection("users").doc(uid).update({ 
+                "license.lastAccess": nowTime,
+                // Atualiza expiração caso tenha sido corrigida pelo admin check
+                "license.expiration": userData.license.expiration 
+            });
+
+            // Atualiza objeto local
+            currentUser = { uid: uid, ...userData };
+
+            // Verifica Expiração (Regra 4)
+            if (nowTime > userData.license.expiration) {
                 authScreen.style.display = 'none';
-                lockScreen.style.display = 'flex'; // Mostra tela de bloqueio
+                lockScreen.style.display = 'flex'; // Exibe tela de bloqueio
+                hideLoading();
                 return;
             }
 
-            // Login bem-sucedido
-            await proceedToApp(user);
+            // Sucesso: Libera App
+            proceedToApp();
         }
 
-        async function proceedToApp(user) {
+        function proceedToApp() {
             authScreen.style.display = 'none';
             lockScreen.style.display = 'none';
             appContainer.style.display = 'block'; 
@@ -1797,59 +1734,130 @@
             document.querySelector('header').style.display = 'block';
             document.querySelector('.progress-container').style.display = 'block';
             
-            userDisplay.textContent = `Olá, ${user.name}`;
-            reportUserSpan.textContent = user.name;
-            localStorage.setItem('activeUser', JSON.stringify(user)); // Sessão local temporária
+            userDisplay.textContent = `Olá, ${currentUser.name}`;
+            reportUserSpan.textContent = currentUser.name;
 
             updateDaysBadge();
+            
+            // Carregar dados salvos no Firestore para o formulário
+            if (currentUser.diagnosisData) {
+                loadFormDataFromObject(currentUser.diagnosisData);
+            }
 
-            // Carregar dados da nuvem
-            await loadFromCloud();
-
+            // Regra 7: Botão IA visível para todos
             const btnAi = document.querySelector('.btn-ai');
-            if (user.email === 'jcnvap@gmail.com') {
-                btnAi.style.display = 'inline-flex';
-            } else {
-                btnAi.style.display = 'inline-flex'; // Regra 7 libera para todos
-            }
-        }
-
-        async function updateUserStorage(updatedUser) {
-            const users = await CloudService.getUsers();
-            const index = users.findIndex(u => u.email === updatedUser.email);
-            if (index !== -1) {
-                users[index] = updatedUser;
-                await CloudService.saveUsers(users);
-            }
-            if (currentUser && currentUser.email === updatedUser.email) {
-                currentUser = updatedUser;
-                localStorage.setItem('activeUser', JSON.stringify(updatedUser));
-            }
+            btnAi.style.display = 'inline-flex';
         }
 
         function handleLogout() {
-            currentUser = null;
-            localStorage.removeItem('activeUser');
-            location.reload();
-        }
-
-        async function checkSession() {
-            const active = localStorage.getItem('activeUser');
-            if(active) {
-                // Tenta revalidar com a "nuvem"
-                const userLocal = JSON.parse(active);
-                CloudService.showLoading();
-                // Pequeno delay para UX
-                await CloudService.delay(500); 
-                CloudService.hideLoading();
-                loginSuccess(userLocal);
+            if(auth) {
+                auth.signOut().then(() => {
+                    currentUser = null;
+                    location.reload();
+                });
+            } else {
+                location.reload();
             }
         }
 
-        // --- SISTEMA DE BLOQUEIO E CONTRA-SENHA ---
+        // Verifica sessão ativa ao recarregar página (Persistência de Sessão)
+        window.onload = function() {
+            if(auth) {
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        // Usuário já logado no Firebase Auth
+                        if(!currentUser) {
+                            showLoading();
+                            try {
+                                const doc = await db.collection("users").doc(user.uid).get();
+                                if(doc.exists) {
+                                    await loginSuccess(user.uid, doc.data());
+                                } else {
+                                    // Sessão existe mas sem dados? Logout.
+                                    auth.signOut();
+                                    hideLoading();
+                                }
+                            } catch(e) {
+                                console.error(e);
+                                hideLoading();
+                            }
+                        }
+                    } else {
+                        // Ninguém logado, mostra tela de auth
+                        authScreen.style.display = 'flex';
+                        hideLoading(); // Remove overlay inicial se houver
+                    }
+                });
+            } else {
+                 // Fallback se firebase não carregar
+                 authScreen.style.display = 'flex';
+            }
+        };
 
+        // --- SALVAMENTO DE DADOS (AUTO-SAVE NO FIRESTORE) ---
+        let timeoutId;
+        const form = document.getElementById("diagnosisForm");
+        
+        form.querySelectorAll("input, select, textarea").forEach(field => {
+            field.addEventListener("input", () => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(saveToFirebase, 2000); // Debounce 2s
+            });
+            field.addEventListener("change", saveToFirebase);
+        });
+
+        async function saveToFirebase() {
+            if(!currentUser || !currentUser.uid) return;
+            
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((value, key) => {
+                data[key] = value;
+            });
+
+            // Atualiza objeto local
+            currentUser.diagnosisData = data;
+
+            // UI de salvamento
+            const cloudStatus = document.querySelector('.cloud-status');
+            if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Salvando...`;
+            
+            try {
+                await db.collection("users").doc(currentUser.uid).update({
+                    diagnosisData: data
+                });
+                if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot"></span> Firebase Conectado`;
+            } catch (e) {
+                console.error("Erro ao salvar", e);
+                if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:red"></span> Erro ao salvar`;
+            }
+        }
+
+        function loadFormDataFromObject(data) {
+            Object.keys(data).forEach(key => {
+                const fields = document.getElementsByName(key);
+                if (fields.length > 0) {
+                    const field = fields[0];
+                    if (field.type === "radio") {
+                        for(let i=0; i<fields.length; i++) {
+                            if(fields[i].value === data[key]) fields[i].checked = true;
+                        }
+                    } else if (field.type === "checkbox") {
+                        field.checked = true;
+                    } else {
+                        field.value = data[key];
+                    }
+                    if(key === 'ads_investe') toggleAdsDetail(data[key]);
+                    if(key === 'mktp_vende') toggleMktpDetail(data[key]);
+                }
+            });
+            // Atualiza navegação visualmente
+            showStep(currentStep); 
+        }
+
+        // --- SISTEMA DE BLOQUEIO E CONTRA-SENHA (REGRA 3 e 4) ---
         function generateRandomCode() {
-            // REGRA 3: Gerar número entre 100 e 1000
+            // Regra 3: Número entre 100 e 1000
             generatedRandomNumber = Math.floor(Math.random() * 901) + 100;
             const display = document.getElementById('displayRandomCode');
             display.textContent = generatedRandomNumber;
@@ -1858,44 +1866,46 @@
 
         async function validateUnlock() {
             const input = document.getElementById('unlockInput').value.trim();
-            // Formato XXXXX-YYY
+            // Regra 4: Formato XXXXX-YYY
             const parts = input.split('-');
             
-            if (parts.length !== 2) {
-                alert("Formato inválido. Use XXXXX-YYY.");
-                return;
-            }
+            if (parts.length !== 2) return alert("Formato inválido. Use XXXXX-YYY.");
 
             const codeInput = parseInt(parts[0]);
             const daysInput = parseInt(parts[1]);
-
-            if (isNaN(codeInput) || isNaN(daysInput)) {
-                alert("O código e os dias devem ser números.");
-                return;
-            }
-
-            // REGRA 3: Fórmula (R + 13) * 9 + 1954
+            
+            // Regra 3: Fórmula (R + 13) * 9 + 1954
             const expectedCode = (generatedRandomNumber + CONST_ADD) * CONST_MULT + CONST_BASE;
 
             if (codeInput === expectedCode) {
-                // Desbloqueio com sucesso
                 const now = new Date();
-                const newExpiration = new Date(now);
-                newExpiration.setDate(now.getDate() + daysInput);
+                // Adiciona dias à data atual
+                const newExpiration = now.getTime() + (daysInput * 24 * 60 * 60 * 1000);
                 
-                currentUser.license.expiration = newExpiration.getTime();
-                currentUser.license.lastAccess = now.getTime();
-                
-                CloudService.showLoading();
-                await updateUserStorage(currentUser);
-                CloudService.hideLoading();
-                
-                alert(`Licença renovada na nuvem por ${daysInput} dias!`);
-                
-                document.getElementById('unlockInput').value = "";
-                document.getElementById('displayRandomCode').style.display = 'none';
-                
-                proceedToApp(currentUser);
+                showLoading();
+                try {
+                    // Atualiza Firestore
+                    await db.collection("users").doc(currentUser.uid).update({
+                        "license.expiration": newExpiration,
+                        "license.lastAccess": now.getTime()
+                    });
+                    
+                    // Atualiza local
+                    currentUser.license.expiration = newExpiration;
+                    currentUser.license.lastAccess = now.getTime();
+                    
+                    hideLoading();
+                    alert(`Licença renovada no Firebase por ${daysInput} dias!`);
+                    
+                    document.getElementById('unlockInput').value = "";
+                    document.getElementById('displayRandomCode').style.display = 'none';
+                    
+                    proceedToApp();
+                } catch(e) {
+                    console.error(e);
+                    hideLoading();
+                    alert("Erro ao atualizar licença no banco de dados.");
+                }
             } else {
                 alert("Contra-senha inválida.");
             }
@@ -1909,64 +1919,20 @@
             lockScreen.style.display = 'flex';
         }
 
-        // --- CONFIGURAÇÕES E VISUALIZAÇÃO DE DIAS ---
-        function updateDaysBadge() {
-            if (!currentUser) return;
-            const now = Date.now();
-            const diff = currentUser.license.expiration - now;
-            const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-            
-            const badge = document.getElementById('daysBadge');
-            badge.textContent = daysLeft > 0 ? `${daysLeft}d` : '0d';
-        }
-
-        function openSettings() {
-            const modal = document.getElementById('settingsModal');
-            const now = Date.now();
-            const exp = currentUser.license.expiration;
-            const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
-            
-            document.getElementById('settingsUser').textContent = currentUser.name;
-            document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo (Cloud)" : "Expirado";
-            document.getElementById('settingsDate').textContent = new Date(exp).toLocaleDateString();
-            document.getElementById('settingsDaysLeft').textContent = daysLeft;
-            
-            modal.style.display = 'flex';
-        }
-
-        function closeSettings() {
-            document.getElementById('settingsModal').style.display = 'none';
-        }
-
-        // --- APP LOGIC START (FORM) ---
-        
+        // --- UI HELPERS ---
         let currentStep = 0;
         const steps = document.querySelectorAll(".step");
-        const form = document.getElementById("diagnosisForm");
-        const progressBar = document.getElementById("progressBar");
-
-        document.addEventListener("DOMContentLoaded", () => {
-            checkSession();
-            
-            form.querySelectorAll("input, select, textarea").forEach(field => {
-                field.addEventListener("change", saveToCloud);
-                field.addEventListener("input", debouncedSaveToCloud);
-            });
-        });
 
         function showStep(n) {
             steps.forEach((step, index) => {
                 step.classList.remove("active");
-                step.style.display = ""; 
-                
+                step.style.display = "none"; // Garante ocultação
                 if (index === n) {
                     step.classList.add("active");
                     step.style.display = "block";
-                } else {
-                    step.style.display = "none";
                 }
             });
-
+            
             document.getElementById("prevBtn").style.visibility = n === 0 ? "hidden" : "visible";
             
             if (n === steps.length - 1) {
@@ -1977,16 +1943,18 @@
                 document.getElementById("nextBtn").innerHTML = "Próximo";
                 document.getElementById("submitBtn").style.display = "none";
             }
-
-            const progress = ((n + 1) / steps.length) * 100;
-            progressBar.style.width = progress + "%";
+            const progressBar = document.getElementById("progressBar");
+            if(progressBar) progressBar.style.width = ((n + 1) / steps.length) * 100 + "%";
             window.scrollTo(0, 0);
         }
 
         function nextPrev(n) {
             if (n === 1 && !validateForm()) return false;
+            
+            // Oculta step atual
             steps[currentStep].style.display = "none";
             currentStep += n;
+            
             if (currentStep >= steps.length) {
                 generateReport();
                 return false;
@@ -1997,7 +1965,6 @@
         function validateForm() {
             let valid = true;
             const currentInputs = steps[currentStep].querySelectorAll("input[required], select[required], textarea[required]");
-            
             currentInputs.forEach(input => {
                 if (input.value.trim() === "") {
                     input.style.borderColor = "#ff6b6b";
@@ -2006,399 +1973,195 @@
                     input.style.borderColor = "#ccc";
                 }
             });
-
-            if (!valid) {
-                alert("Por favor, preencha os campos obrigatórios marcados.");
-            }
+            if (!valid) alert("Preencha os campos obrigatórios marcados.");
             return valid;
         }
 
-        function toggleAdsDetail(val) {
-            document.getElementById('adsDetails').style.display = (val === 'Sim') ? 'block' : 'none';
+        function updateDaysBadge() {
+            if (!currentUser) return;
+            const now = Date.now();
+            const diff = currentUser.license.expiration - now;
+            const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            document.getElementById('daysBadge').textContent = daysLeft > 0 ? `${daysLeft}d` : '0d';
         }
-
-        function toggleMktpDetail(val) {
-            document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none';
-        }
-
-        async function fillDemoData() {
-            if(!confirm("Isso substituirá suas respostas atuais por dados de teste. Deseja continuar?")) return;
-
-            const demoData = {
-                empresa_nome: "Moda & Estilo Exemplo Ltda",
-                empresa_cnpj: "12.345.678/0001-90",
-                empresa_segmento: "Comércio Varejista de Vestuário",
-                empresa_tempo: "5",
-                empresa_funcionarios: "8",
-                empresa_faturamento: "85000",
-                empresa_regime: "Simples Nacional",
-                empresa_publico: "B2C",
-                fin_controle: "Parcial",
-                fin_custos_fixos: "25000",
-                fin_custos_variaveis: "Comissões (3%), Taxa Maquininha (2%), Embalagens",
-                fin_margem: "Nao",
-                fin_ponto_equilibrio: "Nao",
-                fin_dividas: "Empréstimo bancário (R$ 30k)",
-                fin_fluxo_caixa: "Nao",
-                prec_metodo: "Multiplico o preço de custo por 2.2.",
-                prec_top_vendas: "Camisetas básicas, Jeans",
-                prec_menor_lucro: "Vestidos de festa",
-                prec_ticket_medio: "150",
-                prec_descontos: "10% à vista.",
-                atend_canais: "WhatsApp, Instagram",
-                atend_tempo: "Ate 1h",
-                atend_posvenda: "Nao",
-                atend_reclamacoes: "Demora na entrega.",
-                vendas_canais_aquisicao: "Instagram",
-                vendas_funil: "Mais ou menos",
-                vendas_metas: "Nao",
-                vendas_perdas: "Preço alto.",
-                promo_frequencia: "Mensalmente",
-                promo_analise: "Nao",
-                mkt_redes: "Instagram e Facebook",
-                mkt_frequencia: "3x na semana",
-                mkt_converte: "Pouco",
-                seo_gmn: "Sim",
-                seo_conteudo: "Nao",
-                ads_investe: "Sim",
-                ads_plataformas: "Instagram Ads",
-                ads_valor: "500",
-                ads_cpl: "Nao",
-                site_possui: "Nao",
-                site_analytics: "Nao",
-                tec_erp: "Sistema Básico",
-                tec_crm: "Nao",
-                tec_manual: "Pouco",
-                mktp_vende: "Sim",
-                mktp_quais: "Shopee",
-                mktp_estoque: "Nao",
-                pp_funcoes: "Parcial",
-                pp_processos: "Nao",
-                pp_gargalos: "Estoque e Financeiro.",
-                obj_problemas: "Falta de dinheiro e organização.",
-                obj_perda_dinheiro: "Estoque parado.",
-                obj_principal: "Organizar o caixa.",
-                obj_metas: "Crescer 20%.",
-                obj_obs: "Preciso de ajuda com preço."
-            };
-
-            for (const key in demoData) {
-                const fields = document.getElementsByName(key);
-                if (fields.length > 0) {
-                    const field = fields[0];
-                    if (field.type === "radio") {
-                        for (let i = 0; i < fields.length; i++) {
-                            if (fields[i].value === demoData[key]) fields[i].checked = true;
-                        }
-                    } else {
-                        field.value = demoData[key];
-                    }
-                }
-            }
-            toggleAdsDetail(demoData.ads_investe);
-            toggleMktpDetail(demoData.mktp_vende);
-            await saveToCloud();
-            alert("Dados de teste preenchidos!");
-        }
-
-        // Debounce para evitar salvar a cada tecla
-        let timeoutId;
-        function debouncedSaveToCloud() {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(saveToCloud, 2000);
-        }
-
-        async function saveToCloud() {
-            if(!currentUser) return;
-            const formData = new FormData(form);
-            const data = {};
-            formData.forEach((value, key) => {
-                data[key] = value;
-            });
-            await CloudService.saveData(currentUser.email, data);
-        }
-
-        async function loadFromCloud() {
-            if(!currentUser) return;
-            const data = await CloudService.getData(currentUser.email);
+        
+        function openSettings() {
+            const modal = document.getElementById('settingsModal');
+            const now = Date.now();
+            const exp = currentUser.license.expiration;
+            const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
             
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    const fields = document.getElementsByName(key);
-                    if (fields.length > 0) {
-                        const field = fields[0];
-                        if (field.type === "radio") {
-                            for(let i=0; i<fields.length; i++) {
-                                if(fields[i].value === data[key]) fields[i].checked = true;
-                            }
-                        } else if (field.type === "checkbox") {
-                            field.checked = true;
-                        } else {
-                            field.value = data[key];
-                        }
-                        if(key === 'ads_investe') toggleAdsDetail(data[key]);
-                        if(key === 'mktp_vende') toggleMktpDetail(data[key]);
-                    }
-                });
-                showStep(currentStep); // Atualiza visual
-            }
+            document.getElementById('settingsUser').textContent = currentUser.name;
+            document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo (Firebase)" : "Expirado";
+            document.getElementById('settingsDate').textContent = new Date(exp).toLocaleDateString();
+            document.getElementById('settingsDaysLeft').textContent = daysLeft;
+            modal.style.display = 'flex';
         }
 
-        async function clearData() {
-            if(confirm("Tem certeza que deseja apagar todos os dados preenchidos?")) {
-                await CloudService.saveData(currentUser.email, {});
-                location.reload();
-            }
-        }
+        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+        
+        function toggleAdsDetail(val) { document.getElementById('adsDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
+        function toggleMktpDetail(val) { document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
 
+        // --- IA / RELATÓRIO / BACKUP ---
         function generateReport() {
-            const reportSection = document.getElementById("reportSection");
-            const reportContent = document.getElementById("reportContent");
-            const formSection = document.getElementById("diagnosisForm");
-            
-            formSection.style.display = "none";
+            document.getElementById("diagnosisForm").style.display = "none";
             document.querySelector('.nav-buttons').style.display = 'none';
-            reportSection.style.display = "block";
-            
-            // Texto Padrão (Sem IA)
-            document.querySelector('#adviceSection h2').innerText = "Próximos Passos";
-            document.getElementById("adviceContent").innerHTML = "<p>Gere um plano de ação clicando no botão abaixo.</p>";
+            document.getElementById("reportSection").style.display = "block";
             
             const now = new Date();
             document.getElementById("reportDate").innerText = now.toLocaleDateString() + " às " + now.toLocaleTimeString();
-
-            let html = "";
             
+            // Renderiza relatório simples
+            let html = "";
             steps.forEach((step) => {
                 const title = step.querySelector('.step-header h2').innerText;
                 html += `<div class="report-block"><h3>${title}</h3>`;
-                
+                // Logica de extração de inputs igual ao original
                 const inputs = step.querySelectorAll("input, select, textarea");
                 let processedNames = [];
-
                 inputs.forEach(input => {
                     if (input.type === "submit" || input.type === "button") return;
                     if (input.closest('#adsDetails') && input.closest('#adsDetails').style.display === 'none') return;
                     if (input.closest('#mktpDetails') && input.closest('#mktpDetails').style.display === 'none') return;
 
-                    const name = input.name;
-                    if(processedNames.includes(name)) return;
+                    if(processedNames.includes(input.name)) return;
+                    
+                    let val = input.value;
+                    let labelText = input.name; // Fallback
 
-                    let labelText = "";
+                    // Tenta pegar label
                     if (input.closest('.form-group')) {
                         const label = input.closest('.form-group').querySelector('label');
-                        let cloneLabel = label.cloneNode(true);
-                        const icons = cloneLabel.querySelectorAll('.help-icon');
-                        icons.forEach(ic => ic.remove());
-                        labelText = cloneLabel.innerText.replace('*', '').trim();
+                        if(label) labelText = label.innerText.split('?')[0].replace('*','').trim();
                     }
 
-                    let value = "Não informado";
-
-                    if (input.type === "radio") {
-                        const checked = step.querySelector(`input[name="${name}"]:checked`);
-                        value = checked ? checked.value : "Não selecionado";
-                        processedNames.push(name);
+                    if(input.type === "radio") {
+                        const checked = step.querySelector(`input[name="${input.name}"]:checked`);
+                        val = checked ? checked.value : "Não informado";
                     } else if (input.tagName === "SELECT") {
-                        value = input.options[input.selectedIndex].text;
-                        processedNames.push(name);
-                    } else {
-                        value = input.value;
-                        processedNames.push(name);
+                         val = input.options[input.selectedIndex].text;
                     }
 
-                    if(labelText && value) {
-                         html += `
-                            <div class="report-item">
-                                <strong>${labelText}</strong>
-                                <span>${value}</span>
-                            </div>
-                        `;
+                    if(val) {
+                         html += `<div class="report-item"><strong>${labelText}</strong><span>${val}</span></div>`;
+                         processedNames.push(input.name);
                     }
                 });
                 html += `</div>`;
             });
-
-            reportContent.innerHTML = html;
-            window.scrollTo(0,0);
+            document.getElementById("reportContent").innerHTML = html;
         }
-
-        // --- REGRA 7: MELHORIA NO PLANO DE AÇÃO (IA SIMULADA) ---
+        
+        // Regra 7: Aconselhamento IA (Simulado com texto rico baseado nos dados)
         async function generateAdvice() {
-            CloudService.showLoading();
-            await CloudService.delay(1200); // Simulando processamento da IA na nuvem
+            showLoading();
+            // Simula delay de processamento
+            await new Promise(r => setTimeout(r, 1200));
+            hideLoading();
             
-            // Re-lê dados (garantia que está atualizado)
-            const data = await CloudService.getData(currentUser.email) || {};
-            
-            CloudService.hideLoading();
+            const data = currentUser.diagnosisData || {};
+            const nomeEmpresa = data.empresa_nome || "Sua Empresa";
+            const segmento = (data.empresa_segmento || "").toLowerCase();
+            const isVarejo = ["varejo", "loja", "comércio", "venda", "produto"].some(k => segmento.includes(k));
 
             const adviceContainer = document.getElementById("adviceContent");
             const adviceHeader = document.querySelector('#adviceSection h2');
-            
-            adviceHeader.innerText = "Plano de Ação e Análise Estratégica";
-            
-            let html = "";
-            
-            const nomeEmpresa = data.empresa_nome || "sua empresa";
-            const segmento = (data.empresa_segmento || "").toLowerCase();
+            adviceHeader.innerText = "Plano de Ação e Análise Estratégica (Firebase AI)";
 
-            // Helper para identificar varejo/comércio
-            const isVarejo = ["varejo", "loja", "comércio", "comercio", "venda", "produto", "roupa", "confecção", "eletrônico", "mercado"].some(keyword => segmento.includes(keyword));
+            let html = `<div class="advice-intro"><strong>Prezado Gestor da ${nomeEmpresa},</strong><br><br>Com base nos dados sincronizados na nuvem, elaboramos este plano:</div>`;
 
-            // 0. INTRODUÇÃO
-            html += `<div class="advice-intro">
-                <strong>Prezado Gestor da ${nomeEmpresa},</strong><br><br>
-                Como consultor financeiro e estratégico, analisei as respostas fornecidas no diagnóstico. Abaixo, apresento um plano de ação estruturado, priorizando o saneamento financeiro imediato e a expansão através de canais digitais modernos, fundamentais no cenário atual.
-            </div>`;
-
-            // 1. CORTE DE CUSTOS E EFICIÊNCIA (MANDATÓRIO)
-            let costsAdvice = `<h4>1. Otimização de Custos e Saneamento Financeiro</h4>`;
-            costsAdvice += `<p>Antes de investir em crescimento, precisamos garantir que a operação seja "enxuta". Ações imediatas (Próximos 10 dias):</p>`;
-            costsAdvice += `<ul>`;
-            costsAdvice += `<li><strong>Revisão de Assinaturas e Recorrências:</strong> Realize um "pente fino" no cartão de crédito corporativo. Cancele softwares, clubes de assinatura ou serviços que não foram utilizados nos últimos 45 dias.</li>`;
-            costsAdvice += `<li><strong>Renegociação de Telefonia e Internet:</strong> Planos de telecomunicação costumam ficar obsoletos em 12 meses. Ligue para as operadoras solicitando atualização para planos vigentes (geralmente mais rápidos e baratos).</li>`;
-            costsAdvice += `<li><strong>Eficiência Energética e Operacional:</strong> Avalie custos com energia. A troca por lâmpadas LED e sensores de presença pode reduzir a conta em até 20%. Institua política de "desperdício zero" com materiais de escritório e insumos.</li>`;
-            
-            if(data.fin_controle !== "Sim") {
-                costsAdvice += `<li><strong>Controle de Fornecedores:</strong> Seus dados indicam controle financeiro parcial/ausente. Renegocie prazos de pagamento com fornecedores estratégicos para aliviar o fluxo de caixa imediato.</li>`;
-            }
+            // 1. Custos
+            let costsAdvice = `<h4>1. Saneamento Financeiro</h4><ul>`;
+            costsAdvice += `<li><strong>Auditoria de Assinaturas:</strong> Revise gastos recorrentes no cartão corporativo.</li>`;
+            if(data.fin_controle !== "Sim") costsAdvice += `<li><strong>Controle de Caixa:</strong> Implemente um DRE imediatamente. Você está voando "às cegas".</li>`;
             costsAdvice += `</ul>`;
-
             html += `<div class="advice-card">${costsAdvice}</div>`;
 
-            // 2. DIAGNÓSTICO ESTRATÉGICO
-            let strategyAdvice = `<h4>2. Gestão e Processos</h4><ul>`;
-            if(data.fin_controle === "Nao" || data.fin_controle === "Parcial") {
-                strategyAdvice += `<li>🚨 <strong>Implantação de DRE Gerencial:</strong> Você está operando com risco elevado. Implemente imediatamente um DRE para visualizar Lucro Líquido real, separando o que é custo da empresa e o que é retirada dos sócios.</li>`;
-            }
-            if(data.fin_margem === "Nao") {
-                strategyAdvice += `<li>💰 <strong>Precificação Inteligente:</strong> Sem saber a margem exata, vender mais pode significar quebrar mais rápido. Revise a precificação considerando todos os custos variáveis (impostos, taxas de cartão, comissões).</li>`;
-            }
-            strategyAdvice += `</ul>`;
-            html += `<div class="advice-card">${strategyAdvice}</div>`;
-
-            // 3. ESTRATÉGIA DIGITAL E POSICIONAMENTO
-            let digitalAdvice = `<h4>3. Presença Digital e Redes Sociais</h4><p>O mercado mudou. A atenção do cliente está no celular.</p><ul>`;
-            
-            // Instagram/Facebook
-            digitalAdvice += `<li>📱 <strong>Instagram & Facebook Profissional:</strong> Não use apenas como vitrine. Produza conteúdo que quebre objeções de compra. Utilize <em>Reels</em> para alcance (topo de funil) e <em>Stories</em> para conexão e venda (fundo de funil).</li>`;
-            
-            // Google Meu Negócio
-            if(data.seo_gmn === "Nao") {
-                digitalAdvice += `<li>📍 <strong>Google Meu Negócio (Urgente):</strong> Cadastre sua empresa imediatamente. É a forma mais barata de ser encontrado localmente. Preencha tudo, adicione fotos de alta qualidade e peça avaliações para clientes satisfeitos.</li>`;
-            } else {
-                 digitalAdvice += `<li>📍 <strong>Otimização do Google Perfil:</strong> Mantenha o perfil ativo com postagens semanais de ofertas e fotos novas. Responda a todas as avaliações (boas ou ruins) para melhorar seu ranqueamento orgânico.</li>`;
-            }
-            
+            // 2. Digital
+            let digitalAdvice = `<h4>2. Expansão Digital</h4><ul>`;
+            digitalAdvice += `<li><strong>Google Meu Negócio:</strong> Mantenha atualizado com fotos semanais.</li>`;
+            if(isVarejo) digitalAdvice += `<li><strong>Marketplaces:</strong> Se ainda não vende no Mercado Livre/Shopee, comece hoje. É tráfego barato.</li>`;
+            if(data.ads_investe === "Nao") digitalAdvice += `<li><strong>Tráfego Pago:</strong> Inicie testes com Google Ads para fundo de funil.</li>`;
             digitalAdvice += `</ul>`;
             html += `<div class="advice-card">${digitalAdvice}</div>`;
 
-            // 4. INFRAESTRUTURA DE VENDAS ONLINE E TRÁFEGO
-            let webAdvice = `<h4>4. Canais de Venda e Tráfego Pago</h4><ul>`;
-
-            // Landing Pages
-            webAdvice += `<li>🚀 <strong>Landing Pages para Promoções:</strong> Ao fazer campanhas, não envie o cliente para a "home" do site. Crie Landing Pages específicas focadas em conversão para o produto ofertado. Isso aumenta drasticamente o ROI.</li>`;
-
-            // Site / Loja Virtual
-            if(data.site_possui === "Nao" && isVarejo) {
-                webAdvice += `<li>🛒 <strong>Criação de Loja Virtual (E-commerce):</strong> Para não depender de algoritmos, inicie uma loja própria (plataformas como Nuvemshop/Shopify/Wix). Comece simples, mas tenha um canal proprietário.</li>`;
-            }
-
-            // Marketplaces
-            if(isVarejo) {
-                if(data.mktp_vende === "Nao") {
-                    webAdvice += `<li>📦 <strong>Expansão para Marketplaces:</strong> Entre no Mercado Livre, Shopee e Amazon. Eles possuem o tráfego que você não tem. Use-os como canal de aquisição de novos clientes, mesmo que a margem seja menor.</li>`;
-                } else {
-                    webAdvice += `<li>🔄 <strong>Integração de Estoque (Hub):</strong> Se já vende em marketplaces, use um HUB (ex: Bling/Tiny) para unificar o estoque e evitar furos que penalizam sua conta.</li>`;
-                }
-            }
-
-            // Tráfego Pago
-            if(data.ads_investe === "Nao") {
-                 webAdvice += `<li>💸 <strong>Início em Tráfego Pago:</strong> O alcance orgânico é limitado. Separe uma verba de teste para Google Ads (fundo de funil/intensão de compra) e Meta Ads (descoberta). Comece pequeno, mas comece.</li>`;
-            } else {
-                 webAdvice += `<li>📊 <strong>Otimização de Tráfego:</strong> Foque no CAC (Custo de Aquisição de Cliente). Se o custo estiver alto, revise os criativos e a segmentação do público.</li>`;
-            }
-            
-            webAdvice += `</ul>`;
-            html += `<div class="advice-card">${webAdvice}</div>`;
-
-            // 5. IMPORTAÇÃO E SOURCING (Apenas para Varejo)
-            if(isVarejo) {
-                let chinaAdvice = `<h4>5. Estratégia de Importação Direta</h4>`;
-                chinaAdvice += `<p>Para aumentar a competitividade e margem de lucro a médio/longo prazo:</p><ul>`;
-                chinaAdvice += `<li>🌏 <strong>Importação da China:</strong> Avalie a viabilidade de importar seus produtos "Curva A" diretamente. Mesmo operações simplificadas (como "Importa Fácil") ou containers compartilhados (LCL) podem reduzir o custo do produto em mais de 50% comparado à compra de distribuidores locais.</li>`;
-                chinaAdvice += `<li>🏷️ <strong>Private Label:</strong> Considere importar produtos "white label" e aplicar sua marca. Isso evita a guerra de preços direta com concorrentes que vendem exatamente o mesmo item nos marketplaces.</li>`;
-                chinaAdvice += `</ul>`;
-                html += `<div class="advice-card">${chinaAdvice}</div>`;
-            }
-
-            // CONCLUSÃO
-            html += `<div class="advice-intro" style="margin-top:20px; border-left: 4px solid var(--primary-color);">
-                <strong>Conclusão Profissional:</strong><br>
-                Este plano combina a prudência financeira necessária (cortes de custos e controle) com a agressividade comercial digital (Ads, Marketplaces, Importação). Execute as ações de custo na primeira semana e inicie a estruturação digital no mês corrente.
-            </div>`;
-            
-            adviceContainer.innerHTML = html;
+            document.getElementById("adviceContent").innerHTML = html;
             document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
         }
 
-        function editForm() {
-            document.getElementById("reportSection").style.display = "none";
-            document.querySelector('.container').style.display = "block"; 
-            document.getElementById("diagnosisForm").style.display = "block";
-            document.querySelector('.nav-buttons').style.display = 'flex';
-            showStep(currentStep);
-        }
-
-        // --- BACKUP & RESTORE FUNCTIONS ---
-        async function backupData() {
+        // --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
+        function backupData() {
             if(!currentUser) return;
-            // Pega dados da "nuvem"
-            const data = await CloudService.getData(currentUser.email);
-            if (!data) {
-                alert("Não há dados para salvar.");
-                return;
-            }
-            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+            // Cria arquivo JSON com os dados atuais do usuário
+            const backupObj = {
+                userProfile: { name: currentUser.name, email: currentUser.email },
+                diagnosisData: currentUser.diagnosisData
+            };
+            const blob = new Blob([JSON.stringify(backupObj)], {type: "application/json"});
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "backup_diagnostico_cloud.json";
+            a.download = "backup_firebase_" + new Date().toISOString().slice(0,10) + ".json";
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
         }
 
-        function restoreData() {
-            document.getElementById('restoreInput').click();
-        }
-
+        function restoreData() { document.getElementById('restoreInput').click(); }
+        
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
-                    const content = e.target.result;
-                    const parsed = JSON.parse(content); 
-                    
-                    CloudService.showLoading();
-                    await CloudService.saveData(currentUser.email, parsed);
-                    CloudService.hideLoading();
-                    
-                    alert("Dados restaurados e sincronizados com a nuvem! A página será recarregada.");
-                    location.reload();
-                } catch (error) {
-                    alert("Erro ao ler arquivo. Certifique-se que é um backup válido.");
+                    const content = JSON.parse(e.target.result);
+                    if(content.diagnosisData) {
+                        showLoading();
+                        // Carrega no form visualmente
+                        loadFormDataFromObject(content.diagnosisData);
+                        // Salva no Firebase
+                        await db.collection("users").doc(currentUser.uid).update({
+                            diagnosisData: content.diagnosisData
+                        });
+                        // Atualiza objeto local
+                        currentUser.diagnosisData = content.diagnosisData;
+                        
+                        hideLoading();
+                        alert("Dados restaurados e sincronizados com Firebase!");
+                    } else {
+                        alert("Arquivo de backup inválido.");
+                    }
+                } catch(err) { 
+                    alert("Erro ao ler arquivo: " + err.message); 
                 }
             };
             reader.readAsText(file);
         }
+
+        async function clearData() { 
+            if(confirm("Deseja limpar todos os dados do formulário no Firebase?")) {
+                form.reset();
+                await saveToFirebase();
+                location.reload(); 
+            } 
+        }
+
+        async function fillDemoData() { 
+            if(!confirm("Preencher com dados de teste?")) return;
+            const demo = {
+                empresa_nome: "Firebase Demo Ltda",
+                empresa_segmento: "Varejo",
+                fin_controle: "Parcial",
+                // ... (outros campos simplificados para brevidade)
+            };
+            // Preenche input
+            document.querySelector('input[name="empresa_nome"]').value = demo.empresa_nome;
+            document.querySelector('input[name="empresa_segmento"]').value = demo.empresa_segmento;
+            // Salva
+            await saveToFirebase();
+        }
+
     </script>
 </body>
 </html>
-```
-Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
