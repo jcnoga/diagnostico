@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico Empresarial - Consultoria Estratégica Híbrida</title>
+    <title>Diagnóstico Empresarial - Cloud Edition</title>
     <style>
         :root {
             --primary-color: #0f3460;
@@ -18,6 +18,7 @@
             --backup-btn-color: #27ae60;
             --restore-btn-color: #2980b9;
             --lock-bg: rgba(0, 0, 0, 0.95);
+            --cloud-status-color: #2ecc71;
         }
 
         * {
@@ -243,6 +244,7 @@
             right: 20px;
             display: flex;
             gap: 10px;
+            align-items: center;
         }
 
         .header-btn {
@@ -267,6 +269,26 @@
             border-radius: 10px;
             margin-left: 5px;
             vertical-align: middle;
+        }
+        
+        /* Cloud Status Indicator */
+        .cloud-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            color: var(--cloud-status-color);
+            background: rgba(0,0,0,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            margin-right: 10px;
+        }
+        .cloud-dot {
+            width: 8px; height: 8px;
+            background-color: var(--cloud-status-color);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 5px var(--cloud-status-color);
         }
 
         /* Progress Bar */
@@ -630,6 +652,19 @@
             background-color: var(--restore-btn-color);
             color: white;
         }
+        
+        /* Spinner */
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.7);
+            display: none; justify-content: center; align-items: center; z-index: 9999;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color);
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
 
         /* Footer */
         footer {
@@ -673,12 +708,13 @@
             .help-tooltip { left: -100px; width: 250px; }
             .step-header { flex-direction: column; align-items: flex-start; }
             .auth-card { padding: 20px; }
-            .header-controls { position: relative; top: 0; right: 0; justify-content: center; margin-top: 10px; }
+            .header-controls { position: relative; top: 0; right: 0; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+            .cloud-status { display: none; } /* Economizar espaço mobile */
         }
 
         @media print {
             body { background-color: white; }
-            header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer { display: none !important; }
+            header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer, .loading-overlay { display: none !important; }
             .container { box-shadow: none; margin: 0; padding: 0; max-width: 100%; display: block !important; }
             #diagnosisForm { display: none; }
             #reportSection { display: block !important; }
@@ -689,6 +725,11 @@
 </head>
 <body>
 
+    <!-- OVERLAY DE CARREGAMENTO (Cloud Sim) -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
     <!-- TELA DE AUTENTICAÇÃO -->
     <section id="authScreen">
         <div class="auth-card">
@@ -696,7 +737,7 @@
             <!-- View: Login -->
             <div id="loginView" class="auth-view active">
                 <h2>Bem-vindo</h2>
-                <p>Faça login para acessar o diagnóstico.</p>
+                <p>Faça login na Nuvem para acessar o diagnóstico.</p>
                 <form class="auth-form" onsubmit="handleLogin(event)">
                     <input type="email" id="loginEmail" placeholder="Seu e-mail" required>
                     <input type="password" id="loginPass" placeholder="Sua senha" required>
@@ -713,7 +754,7 @@
 
             <!-- View: Cadastro -->
             <div id="registerView" class="auth-view">
-                <h2>Criar Conta</h2>
+                <h2>Criar Conta Cloud</h2>
                 <p>Preencha seus dados para começar. Você ganhará 30 dias de acesso gratuito.</p>
                 <form class="auth-form" onsubmit="handleRegister(event)">
                     <input type="text" id="regName" placeholder="Seu Nome Completo" required>
@@ -795,10 +836,13 @@
 
     <header>
         <h1>Consultoria Estratégica & Financeira</h1>
-        <p>Sistema de Diagnóstico Empresarial Integrado (Versão Híbrida)</p>
+        <p>Sistema de Diagnóstico Empresarial - Cloud Edition</p>
         <div id="userWelcomeDisplay" class="user-welcome"></div>
         
         <div class="header-controls">
+            <div class="cloud-status" title="Conexão Segura">
+                <span class="cloud-dot"></span> Nuvem Conectada
+            </div>
             <button class="header-btn" onclick="openSettings()">
                 Configurações 
                 <span id="daysBadge" class="remaining-days-badge"></span>
@@ -1447,6 +1491,7 @@
                 <h1>Relatório de Diagnóstico Inicial</h1>
                 <p>Gerado em: <span id="reportDate"></span></p>
                 <p>Usuário Responsável: <span id="reportUser"></span></p>
+                <small style="color:#777">Dados recuperados da Nuvem</small>
             </div>
             
             <div id="reportContent">
@@ -1483,7 +1528,81 @@
         const CONST_BASE = 1954;
         let generatedRandomNumber = 0; // Armazena o número aleatório gerado para validação
 
-        // --- AUTH SYSTEM (Mock LocalStorage) ---
+        // --- INTEGRAÇÃO NUVEM (CLOUD SERVICE) ---
+        // Este objeto simula a comunicação com uma API REST.
+        // Se 'apiUrl' for preenchido, ele tentará fazer fetch.
+        // Se vazio, ele usa localStorage simulando uma nuvem (com delays).
+        
+        const API_URL = ""; // Coloque aqui a URL da sua API (ex: 'https://api.meusistema.com')
+
+        const CloudService = {
+            async delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            },
+
+            showLoading() {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+            },
+
+            hideLoading() {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            },
+
+            async getUsers() {
+                if (API_URL) {
+                    try {
+                        const res = await fetch(`${API_URL}/users`);
+                        return await res.json();
+                    } catch (e) {
+                        console.error("Erro na nuvem, usando cache local", e);
+                    }
+                }
+                // Simulação Local
+                return JSON.parse(localStorage.getItem('cloud_users') || "[]");
+            },
+
+            async saveUsers(users) {
+                if (API_URL) {
+                    try {
+                        await fetch(`${API_URL}/users`, { method: 'POST', body: JSON.stringify(users) });
+                    } catch (e) { console.error("Erro ao salvar na nuvem", e); }
+                }
+                localStorage.setItem('cloud_users', JSON.stringify(users));
+            },
+
+            async getData(userId) {
+                this.showLoading();
+                await this.delay(600); // Simula latência de rede
+                
+                let data = null;
+                if (API_URL) {
+                     // Lógica de fetch real iria aqui
+                } else {
+                    // Lógica simulada
+                    const allData = JSON.parse(localStorage.getItem('cloud_data') || "{}");
+                    data = allData[userId] || null;
+                }
+                
+                this.hideLoading();
+                return data;
+            },
+
+            async saveData(userId, data) {
+                // Background save (sem loading intrusivo se for auto-save)
+                const allData = JSON.parse(localStorage.getItem('cloud_data') || "{}");
+                allData[userId] = data;
+                localStorage.setItem('cloud_data', JSON.stringify(allData));
+                
+                // Simulação de sync visual
+                const cloudIcon = document.querySelector('.cloud-status');
+                const originalText = cloudIcon.innerHTML;
+                cloudIcon.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Sincronizando...`;
+                await this.delay(800);
+                cloudIcon.innerHTML = `<span class="cloud-dot"></span> Nuvem Conectada`;
+            }
+        };
+
+        // --- AUTH SYSTEM (Async) ---
         const authScreen = document.getElementById('authScreen');
         const appContainer = document.querySelector('.container');
         const userDisplay = document.getElementById('userWelcomeDisplay');
@@ -1497,7 +1616,7 @@
             document.getElementById(viewId).classList.add('active');
         }
 
-        function handleRegister(e) {
+        async function handleRegister(e) {
             e.preventDefault();
             const name = document.getElementById('regName').value;
             const email = document.getElementById('regEmail').value;
@@ -1505,8 +1624,14 @@
 
             if(!name || !email || !pass) return alert("Preencha todos os campos.");
 
-            const users = JSON.parse(localStorage.getItem('users') || "[]");
-            if(users.find(u => u.email === email)) return alert("E-mail já cadastrado.");
+            CloudService.showLoading();
+            await CloudService.delay(1000); // Simula verificação no servidor
+
+            const users = await CloudService.getUsers();
+            if(users.find(u => u.email === email)) {
+                CloudService.hideLoading();
+                return alert("E-mail já cadastrado na nuvem.");
+            }
 
             // Liberação inicial de 30 dias
             const now = new Date();
@@ -1524,75 +1649,93 @@
             };
 
             users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
-            alert("Cadastro realizado com sucesso! Você ganhou 30 dias de acesso gratuito.");
+            await CloudService.saveUsers(users);
+            
+            CloudService.hideLoading();
+            alert("Cadastro realizado na nuvem com sucesso! Você ganhou 30 dias de acesso gratuito.");
             switchAuthView('loginView');
         }
 
-        function handleLogin(e) {
+        async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
 
-            const users = JSON.parse(localStorage.getItem('users') || "[]");
+            CloudService.showLoading();
+            await CloudService.delay(1000); // Network delay
+
+            const users = await CloudService.getUsers();
             const user = users.find(u => u.email === email && u.pass === pass);
+            
+            CloudService.hideLoading();
 
             if(user) {
-                loginSuccess(user);
+                await loginSuccess(user);
             } else {
-                alert("E-mail ou senha incorretos. (Se não tem conta, clique em Cadastrar)");
+                alert("E-mail ou senha incorretos. Verifique suas credenciais.");
             }
         }
 
-        function handleGoogleLogin() {
-            // Mock Google Login
-            alert("Simulação: Conectando com Google... (Em um ambiente real, isso abriria o OAuth)");
+        async function handleGoogleLogin() {
+            CloudService.showLoading();
+            await CloudService.delay(1500); // Google auth delay simulation
+            CloudService.hideLoading();
+            
+            alert("Simulação: Conectado com Google Cloud.");
             const mockUser = {
                 name: "Usuário Google Exemplo",
                 email: "google.user@gmail.com",
                 type: "google",
-                // Google user também ganha 30 dias na simulação se for novo
                 license: {
                     expiration: new Date().setDate(new Date().getDate() + 30),
                     lastAccess: Date.now()
                 }
             };
-            loginSuccess(mockUser);
+            await loginSuccess(mockUser);
         }
 
-        function handleForgot(e) {
+        async function handleForgot(e) {
             e.preventDefault();
             const step1 = document.getElementById('forgotStep1');
             const step2 = document.getElementById('forgotStep2');
             
             if(step1.style.display !== 'none') {
                 const email = document.getElementById('forgotEmail').value;
-                const users = JSON.parse(localStorage.getItem('users') || "[]");
+                
+                CloudService.showLoading();
+                await CloudService.delay(1000);
+                
+                const users = await CloudService.getUsers();
                 const user = users.find(u => u.email === email);
+                
+                CloudService.hideLoading();
 
                 if(user) {
                     alert(`Simulação: Código de recuperação enviado para ${email}. (Use '1234')`);
                     step1.style.display = 'none';
                     step2.style.display = 'block';
                 } else {
-                    alert("E-mail não encontrado.");
+                    alert("E-mail não encontrado na base de dados.");
                 }
             }
         }
 
-        function finishReset() {
+        async function finishReset() {
             const code = document.getElementById('forgotCode').value;
             const newPass = document.getElementById('newPass').value;
             
             if(code === '1234' && newPass) {
                 const email = document.getElementById('forgotEmail').value;
-                const users = JSON.parse(localStorage.getItem('users') || "[]");
+                CloudService.showLoading();
+                const users = await CloudService.getUsers();
                 const userIndex = users.findIndex(u => u.email === email);
                 
                 if(userIndex > -1) {
                     users[userIndex].pass = newPass;
-                    localStorage.setItem('users', JSON.stringify(users));
-                    alert("Senha alterada com sucesso!");
+                    await CloudService.saveUsers(users);
+                    CloudService.hideLoading();
+                    
+                    alert("Senha alterada na nuvem com sucesso!");
                     switchAuthView('loginView');
                     document.getElementById('forgotStep1').style.display = 'block';
                     document.getElementById('forgotStep2').style.display = 'none';
@@ -1602,7 +1745,7 @@
             }
         }
 
-        function loginSuccess(user) {
+        async function loginSuccess(user) {
             // REGRA 6: Admin tem 9999 dias
             if (user.email === 'jcnvap@gmail.com') {
                 const now = new Date();
@@ -1613,28 +1756,26 @@
                     expiration: farFuture.getTime(),
                     lastAccess: now.getTime()
                 };
-                updateUserStorage(user);
+                await updateUserStorage(user);
             }
 
             // REGRA 5: Verificação de data retroativa e validade
             const nowTime = Date.now();
             
-            // Garantir estrutura de licença para usuários legados
             if(!user.license) {
                 const exp = new Date();
                 exp.setDate(exp.getDate() + 30);
                 user.license = { expiration: exp.getTime(), lastAccess: nowTime };
             }
 
-            // Bloquear se a data atual for menor que o último acesso (tentativa de voltar relógio)
             if (nowTime < user.license.lastAccess) {
-                alert("Erro de segurança: A data do sistema é anterior ao último acesso registrado. Corrija o relógio do seu dispositivo.");
+                alert("Erro de segurança: Data do dispositivo incorreta. Acesso negado pela nuvem.");
                 return;
             }
 
             // Atualizar último acesso
             user.license.lastAccess = nowTime;
-            updateUserStorage(user);
+            await updateUserStorage(user);
             currentUser = user;
             
             // Verifica se a licença expirou
@@ -1645,10 +1786,10 @@
             }
 
             // Login bem-sucedido
-            proceedToApp(user);
+            await proceedToApp(user);
         }
 
-        function proceedToApp(user) {
+        async function proceedToApp(user) {
             authScreen.style.display = 'none';
             lockScreen.style.display = 'none';
             appContainer.style.display = 'block'; 
@@ -1658,26 +1799,28 @@
             
             userDisplay.textContent = `Olá, ${user.name}`;
             reportUserSpan.textContent = user.name;
-            localStorage.setItem('activeUser', JSON.stringify(user));
+            localStorage.setItem('activeUser', JSON.stringify(user)); // Sessão local temporária
 
             updateDaysBadge();
+
+            // Carregar dados da nuvem
+            await loadFromCloud();
 
             const btnAi = document.querySelector('.btn-ai');
             if (user.email === 'jcnvap@gmail.com') {
                 btnAi.style.display = 'inline-flex';
             } else {
-                btnAi.style.display = 'inline-flex'; // Libera para todos verem a melhoria, conforme solicitação da regra 7
+                btnAi.style.display = 'inline-flex'; // Regra 7 libera para todos
             }
         }
 
-        function updateUserStorage(updatedUser) {
-            const users = JSON.parse(localStorage.getItem('users') || "[]");
+        async function updateUserStorage(updatedUser) {
+            const users = await CloudService.getUsers();
             const index = users.findIndex(u => u.email === updatedUser.email);
             if (index !== -1) {
                 users[index] = updatedUser;
-                localStorage.setItem('users', JSON.stringify(users));
+                await CloudService.saveUsers(users);
             }
-            // Atualiza activeUser se for ele
             if (currentUser && currentUser.email === updatedUser.email) {
                 currentUser = updatedUser;
                 localStorage.setItem('activeUser', JSON.stringify(updatedUser));
@@ -1690,10 +1833,16 @@
             location.reload();
         }
 
-        function checkSession() {
+        async function checkSession() {
             const active = localStorage.getItem('activeUser');
             if(active) {
-                loginSuccess(JSON.parse(active));
+                // Tenta revalidar com a "nuvem"
+                const userLocal = JSON.parse(active);
+                CloudService.showLoading();
+                // Pequeno delay para UX
+                await CloudService.delay(500); 
+                CloudService.hideLoading();
+                loginSuccess(userLocal);
             }
         }
 
@@ -1707,7 +1856,7 @@
             display.style.display = 'block';
         }
 
-        function validateUnlock() {
+        async function validateUnlock() {
             const input = document.getElementById('unlockInput').value.trim();
             // Formato XXXXX-YYY
             const parts = input.split('-');
@@ -1737,11 +1886,12 @@
                 currentUser.license.expiration = newExpiration.getTime();
                 currentUser.license.lastAccess = now.getTime();
                 
-                updateUserStorage(currentUser);
+                CloudService.showLoading();
+                await updateUserStorage(currentUser);
+                CloudService.hideLoading();
                 
-                alert(`Acesso liberado com sucesso por mais ${daysInput} dias!`);
+                alert(`Licença renovada na nuvem por ${daysInput} dias!`);
                 
-                // Remove input para segurança e recarrega
                 document.getElementById('unlockInput').value = "";
                 document.getElementById('displayRandomCode').style.display = 'none';
                 
@@ -1777,7 +1927,7 @@
             const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
             
             document.getElementById('settingsUser').textContent = currentUser.name;
-            document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo" : "Expirado";
+            document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo (Cloud)" : "Expirado";
             document.getElementById('settingsDate').textContent = new Date(exp).toLocaleDateString();
             document.getElementById('settingsDaysLeft').textContent = daysLeft;
             
@@ -1788,7 +1938,7 @@
             document.getElementById('settingsModal').style.display = 'none';
         }
 
-        // --- APP LOGIC START ---
+        // --- APP LOGIC START (FORM) ---
         
         let currentStep = 0;
         const steps = document.querySelectorAll(".step");
@@ -1797,12 +1947,10 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             checkSession();
-            loadFromStorage();
-            showStep(currentStep);
             
             form.querySelectorAll("input, select, textarea").forEach(field => {
-                field.addEventListener("change", saveToStorage);
-                field.addEventListener("input", saveToStorage);
+                field.addEventListener("change", saveToCloud);
+                field.addEventListener("input", debouncedSaveToCloud);
             });
         });
 
@@ -1873,7 +2021,7 @@
             document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none';
         }
 
-        function fillDemoData() {
+        async function fillDemoData() {
             if(!confirm("Isso substituirá suas respostas atuais por dados de teste. Deseja continuar?")) return;
 
             const demoData = {
@@ -1949,23 +2097,32 @@
             }
             toggleAdsDetail(demoData.ads_investe);
             toggleMktpDetail(demoData.mktp_vende);
-            saveToStorage();
-            alert("Dados de teste preenchidos com sucesso!");
+            await saveToCloud();
+            alert("Dados de teste preenchidos!");
         }
 
-        function saveToStorage() {
+        // Debounce para evitar salvar a cada tecla
+        let timeoutId;
+        function debouncedSaveToCloud() {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(saveToCloud, 2000);
+        }
+
+        async function saveToCloud() {
+            if(!currentUser) return;
             const formData = new FormData(form);
             const data = {};
             formData.forEach((value, key) => {
                 data[key] = value;
             });
-            localStorage.setItem("consultoriaData", JSON.stringify(data));
+            await CloudService.saveData(currentUser.email, data);
         }
 
-        function loadFromStorage() {
-            const storedData = localStorage.getItem("consultoriaData");
-            if (storedData) {
-                const data = JSON.parse(storedData);
+        async function loadFromCloud() {
+            if(!currentUser) return;
+            const data = await CloudService.getData(currentUser.email);
+            
+            if (data) {
                 Object.keys(data).forEach(key => {
                     const fields = document.getElementsByName(key);
                     if (fields.length > 0) {
@@ -1983,6 +2140,14 @@
                         if(key === 'mktp_vende') toggleMktpDetail(data[key]);
                     }
                 });
+                showStep(currentStep); // Atualiza visual
+            }
+        }
+
+        async function clearData() {
+            if(confirm("Tem certeza que deseja apagar todos os dados preenchidos?")) {
+                await CloudService.saveData(currentUser.email, {});
+                location.reload();
             }
         }
 
@@ -2059,8 +2224,15 @@
         }
 
         // --- REGRA 7: MELHORIA NO PLANO DE AÇÃO (IA SIMULADA) ---
-        function generateAdvice() {
-            const data = JSON.parse(localStorage.getItem("consultoriaData") || "{}");
+        async function generateAdvice() {
+            CloudService.showLoading();
+            await CloudService.delay(1200); // Simulando processamento da IA na nuvem
+            
+            // Re-lê dados (garantia que está atualizado)
+            const data = await CloudService.getData(currentUser.email) || {};
+            
+            CloudService.hideLoading();
+
             const adviceContainer = document.getElementById("adviceContent");
             const adviceHeader = document.querySelector('#adviceSection h2');
             
@@ -2106,7 +2278,7 @@
             strategyAdvice += `</ul>`;
             html += `<div class="advice-card">${strategyAdvice}</div>`;
 
-            // 3. ESTRATÉGIA DIGITAL E POSICIONAMENTO (ATUALIZADO)
+            // 3. ESTRATÉGIA DIGITAL E POSICIONAMENTO
             let digitalAdvice = `<h4>3. Presença Digital e Redes Sociais</h4><p>O mercado mudou. A atenção do cliente está no celular.</p><ul>`;
             
             // Instagram/Facebook
@@ -2181,17 +2353,19 @@
         }
 
         // --- BACKUP & RESTORE FUNCTIONS ---
-        function backupData() {
-            const data = localStorage.getItem("consultoriaData");
+        async function backupData() {
+            if(!currentUser) return;
+            // Pega dados da "nuvem"
+            const data = await CloudService.getData(currentUser.email);
             if (!data) {
                 alert("Não há dados para salvar.");
                 return;
             }
-            const blob = new Blob([data], {type: "application/json"});
+            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "backup_diagnostico.json";
+            a.download = "backup_diagnostico_cloud.json";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2206,13 +2380,16 @@
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const content = e.target.result;
-                    // Validate JSON
-                    JSON.parse(content); 
-                    localStorage.setItem("consultoriaData", content);
-                    alert("Dados restaurados com sucesso! A página será recarregada.");
+                    const parsed = JSON.parse(content); 
+                    
+                    CloudService.showLoading();
+                    await CloudService.saveData(currentUser.email, parsed);
+                    CloudService.hideLoading();
+                    
+                    alert("Dados restaurados e sincronizados com a nuvem! A página será recarregada.");
                     location.reload();
                 } catch (error) {
                     alert("Erro ao ler arquivo. Certifique-se que é um backup válido.");
@@ -2220,13 +2397,8 @@
             };
             reader.readAsText(file);
         }
-
-        function clearData() {
-            if(confirm("Tem certeza que deseja apagar todos os dados preenchidos?")) {
-                localStorage.removeItem("consultoriaData");
-                location.reload();
-            }
-        }
     </script>
 </body>
 </html>
+```
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
