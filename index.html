@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diagnóstico Empresarial - Firebase Real</title>
     
-    <!-- FIREBASE SDKs (Compat Version para facilitar uso em arquivo único) -->
+    <!-- FIREBASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -2148,19 +2148,94 @@ const firebaseConfig = {
             } 
         }
 
-        async function fillDemoData() { 
-            if(!confirm("Preencher com dados de teste?")) return;
-            const demo = {
-                empresa_nome: "Firebase Demo Ltda",
-                empresa_segmento: "Varejo",
+        async function fillDemoData() {
+            if(!confirm("Isso substituirá os dados atuais por dados de teste completos.")) return;
+
+            // 1. Dados Completos e Realistas de Pequeno Comércio
+            const demoData = {
+                empresa_nome: "Loja Modelo & Estilo",
+                empresa_cnpj: "12.345.678/0001-90",
+                empresa_segmento: "Comércio Varejista de Roupas",
+                empresa_tempo: "5",
+                empresa_funcionarios: "4",
+                empresa_faturamento: "55000.00",
+                empresa_regime: "Simples Nacional",
+                empresa_publico: "B2C",
                 fin_controle: "Parcial",
-                // ... (outros campos simplificados para brevidade)
+                fin_custos_fixos: "15000.00",
+                fin_custos_variaveis: "Taxas de cartão (3.5%), Comissões (3%), Impostos (Simples), Embalagens.",
+                fin_margem: "Nao",
+                fin_ponto_equilibrio: "Nao",
+                fin_dividas: "Empréstimo bancário (parcela de R$ 1.500).",
+                fin_fluxo_caixa: "Nao",
+                prec_metodo: "Multiplico o preço de custo por 2.0 (Markup).",
+                prec_top_vendas: "Camisetas, Calças Jeans, Acessórios.",
+                prec_menor_lucro: "Produtos em promoção ou ponta de estoque.",
+                prec_ticket_medio: "120.00",
+                prec_descontos: "5% para pagamento no PIX ou dinheiro.",
+                atend_canais: "WhatsApp, Instagram e Telefone.",
+                atend_tempo: "Ate 1h",
+                atend_posvenda: "Nao",
+                atend_reclamacoes: "Demora na entrega ou falta de numeração.",
+                vendas_canais_aquisicao: "Instagram, Fachada da loja, Indicação.",
+                vendas_funil: "Mais ou menos",
+                vendas_metas: "Nao",
+                vendas_perdas: "Cliente acha caro ou não tem o tamanho.",
+                promo_frequencia: "Sazonalmente",
+                promo_analise: "Nao",
+                mkt_redes: "Instagram e Facebook.",
+                mkt_frequencia: "2 a 3 vezes por semana.",
+                mkt_converte: "Pouco",
+                seo_gmn: "Sim",
+                seo_conteudo: "Nao",
+                ads_investe: "Sim",
+                ads_plataformas: "Instagram (Botão Turbinar)",
+                ads_valor: "300.00",
+                ads_cpl: "Nao",
+                site_possui: "Nao",
+                site_analytics: "Nao",
+                tec_erp: "Sistema de gestão básico (Bling/Tiny).",
+                tec_crm: "Nao",
+                tec_manual: "Muito",
+                mktp_vende: "Sim",
+                mktp_quais: "Shopee e Mercado Livre (iniciando).",
+                mktp_estoque: "Nao",
+                pp_funcoes: "Parcial",
+                pp_processos: "Nao",
+                pp_gargalos: "Falta de tempo para gestão, faço tudo sozinho(a).",
+                obj_problemas: "Sobra pouco dinheiro no fim do mês, não sei precificar corretamente.",
+                obj_perda_dinheiro: "Estoque parado e taxas de cartão.",
+                obj_principal: "Organizar o financeiro e aumentar o lucro.",
+                obj_metas: "Contratar um gerente e abrir e-commerce.",
+                obj_obs: "Preciso de ajuda urgente com fluxo de caixa."
             };
-            // Preenche input
-            document.querySelector('input[name="empresa_nome"]').value = demo.empresa_nome;
-            document.querySelector('input[name="empresa_segmento"]').value = demo.empresa_segmento;
-            // Salva
+
+            // 2. Itera sobre o objeto e preenche o DOM
+            for (const key in demoData) {
+                const val = demoData[key];
+                const fields = document.getElementsByName(key);
+
+                if (fields.length > 0) {
+                    const field = fields[0]; 
+
+                    if (field.type === 'radio') {
+                        // Radio Buttons
+                        const radio = document.querySelector(`input[name="${key}"][value="${val}"]`);
+                        if (radio) radio.checked = true;
+                    } else {
+                        // Text, Number, Select, Textarea
+                        field.value = val;
+                    }
+                }
+            }
+
+            // 3. Controla visibilidade de campos condicionais
+            if (typeof toggleAdsDetail === 'function') toggleAdsDetail(demoData.ads_investe);
+            if (typeof toggleMktpDetail === 'function') toggleMktpDetail(demoData.mktp_vende);
+
+            // 4. Salva no Firebase
             await saveToFirebase();
+            alert("Dados de teste preenchidos com sucesso!");
         }
 
     </script>
