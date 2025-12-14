@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico Empresarial - Consultoria Estratégica</title>
+    <title>Diagnóstico Empresarial - Consultoria Estratégica Híbrida</title>
     <style>
         :root {
             --primary-color: #0f3460;
@@ -17,6 +17,7 @@
             --demo-btn-color: #f39c12;
             --backup-btn-color: #27ae60;
             --restore-btn-color: #2980b9;
+            --lock-bg: rgba(0, 0, 0, 0.95);
         }
 
         * {
@@ -144,6 +145,73 @@
             display: block;
         }
 
+        /* --- LOCK SCREEN (LICENSING) --- */
+        #lockScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--lock-bg);
+            z-index: 3000;
+            display: none; /* Controlado via JS */
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 20px;
+        }
+
+        .lock-content {
+            background: #2c3e50;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
+            border: 2px solid var(--secondary-color);
+        }
+
+        .lock-content h2 { color: var(--secondary-color); margin-bottom: 20px; }
+        .lock-content p { margin-bottom: 15px; color: #ecf0f1; }
+        
+        .generated-code-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--demo-btn-color);
+            margin: 20px 0;
+            letter-spacing: 2px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .lock-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer;
+            font-size: 1rem; margin-top: 10px;
+        }
+
+        /* --- SETTINGS MODAL --- */
+        #settingsModal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2500;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .settings-card {
+            background: white; width: 90%; max-width: 500px;
+            padding: 25px; border-radius: 10px; position: relative;
+        }
+        .close-settings {
+            position: absolute; top: 10px; right: 15px;
+            font-size: 1.5rem; cursor: pointer; color: #aaa;
+        }
+
         /* --- APP HEADER --- */
         header {
             background-color: var(--primary-color);
@@ -169,20 +237,36 @@
             border-radius: 20px;
         }
 
-        .logout-btn {
+        .header-controls {
             position: absolute;
             top: 20px;
             right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-btn {
             background: transparent;
             border: 1px solid rgba(255,255,255,0.3);
             color: white;
             font-size: 0.8rem;
             padding: 5px 10px;
             cursor: pointer;
+            transition: all 0.2s;
         }
         
-        .logout-btn:hover {
+        .header-btn:hover {
             background: rgba(255,255,255,0.1);
+        }
+
+        .remaining-days-badge {
+            background-color: var(--demo-btn-color);
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+            vertical-align: middle;
         }
 
         /* Progress Bar */
@@ -589,11 +673,12 @@
             .help-tooltip { left: -100px; width: 250px; }
             .step-header { flex-direction: column; align-items: flex-start; }
             .auth-card { padding: 20px; }
+            .header-controls { position: relative; top: 0; right: 0; justify-content: center; margin-top: 10px; }
         }
 
         @media print {
             body { background-color: white; }
-            header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, footer { display: none !important; }
+            header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer { display: none !important; }
             .container { box-shadow: none; margin: 0; padding: 0; max-width: 100%; display: block !important; }
             #diagnosisForm { display: none; }
             #reportSection { display: block !important; }
@@ -629,7 +714,7 @@
             <!-- View: Cadastro -->
             <div id="registerView" class="auth-view">
                 <h2>Criar Conta</h2>
-                <p>Preencha seus dados para começar.</p>
+                <p>Preencha seus dados para começar. Você ganhará 30 dias de acesso gratuito.</p>
                 <form class="auth-form" onsubmit="handleRegister(event)">
                     <input type="text" id="regName" placeholder="Seu Nome Completo" required>
                     <input type="email" id="regEmail" placeholder="Seu E-mail" required>
@@ -664,6 +749,45 @@
         </div>
     </section>
 
+    <!-- TELA DE BLOQUEIO / LICENÇA -->
+    <section id="lockScreen">
+        <div class="lock-content">
+            <h2>⚠️ Acesso Expirado</h2>
+            <p>Seu período de utilização encerrou.</p>
+            <p>Para continuar utilizando, gere o código abaixo e informe a contra-senha.</p>
+            
+            <button class="lock-btn" onclick="generateRandomCode()">Gerar Código de Desbloqueio</button>
+            <div id="displayRandomCode" class="generated-code-display" style="display:none;"></div>
+            
+            <div style="margin-top: 20px;">
+                <label style="color:white; display:block;">Contra-senha (Formato: XXXXX-YYY)</label>
+                <input type="text" id="unlockInput" placeholder="Ex: 12345-30" style="text-align:center;">
+                <button class="lock-btn" onclick="validateUnlock()">Liberar Acesso</button>
+            </div>
+            
+            <button class="logout-btn" style="position:static; margin-top:20px; border-color:#999;" onclick="handleLogout()">Sair / Trocar Conta</button>
+        </div>
+    </section>
+
+    <!-- MODAL DE CONFIGURAÇÕES -->
+    <div id="settingsModal">
+        <div class="settings-card">
+            <span class="close-settings" onclick="closeSettings()">&times;</span>
+            <h2>Configurações e Assinatura</h2>
+            <hr style="margin: 15px 0;">
+            <p><strong>Usuário:</strong> <span id="settingsUser"></span></p>
+            <p><strong>Status:</strong> <span id="settingsStatus"></span></p>
+            <p><strong>Validade da Licença:</strong> <span id="settingsDate"></span></p>
+            <p style="font-size: 1.2rem; margin-top: 10px; color: var(--primary-color);">
+                <strong>Dias Restantes: </strong> <span id="settingsDaysLeft"></span>
+            </p>
+            <hr style="margin: 15px 0;">
+            <h3>Renovação Antecipada</h3>
+            <p style="font-size: 0.9rem; margin-bottom: 10px;">Caso deseje estender seu prazo antes do vencimento.</p>
+            <button class="btn-demo" onclick="openLockScreenForRenewal()">Inserir Código de Renovação</button>
+        </div>
+    </div>
+
     <!-- APLICAÇÃO PRINCIPAL -->
     <div class="progress-container">
         <div class="progress-bar" id="progressBar"></div>
@@ -671,9 +795,16 @@
 
     <header>
         <h1>Consultoria Estratégica & Financeira</h1>
-        <p>Sistema de Diagnóstico Empresarial Integrado</p>
+        <p>Sistema de Diagnóstico Empresarial Integrado (Versão Híbrida)</p>
         <div id="userWelcomeDisplay" class="user-welcome"></div>
-        <button class="logout-btn" onclick="handleLogout()">Sair</button>
+        
+        <div class="header-controls">
+            <button class="header-btn" onclick="openSettings()">
+                Configurações 
+                <span id="daysBadge" class="remaining-days-badge"></span>
+            </button>
+            <button class="header-btn" onclick="handleLogout()">Sair</button>
+        </div>
     </header>
 
     <div class="container">
@@ -1346,11 +1477,18 @@
     </footer>
 
     <script>
+        // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
+        const CONST_ADD = 13;
+        const CONST_MULT = 9;
+        const CONST_BASE = 1954;
+        let generatedRandomNumber = 0; // Armazena o número aleatório gerado para validação
+
         // --- AUTH SYSTEM (Mock LocalStorage) ---
         const authScreen = document.getElementById('authScreen');
         const appContainer = document.querySelector('.container');
         const userDisplay = document.getElementById('userWelcomeDisplay');
         const reportUserSpan = document.getElementById('reportUser');
+        const lockScreen = document.getElementById('lockScreen');
 
         let currentUser = null;
 
@@ -1370,9 +1508,24 @@
             const users = JSON.parse(localStorage.getItem('users') || "[]");
             if(users.find(u => u.email === email)) return alert("E-mail já cadastrado.");
 
-            users.push({ name, email, pass });
+            // Liberação inicial de 30 dias
+            const now = new Date();
+            const expirationDate = new Date(now);
+            expirationDate.setDate(now.getDate() + 30);
+
+            const newUser = { 
+                name, 
+                email, 
+                pass,
+                license: {
+                    expiration: expirationDate.getTime(),
+                    lastAccess: now.getTime()
+                }
+            };
+
+            users.push(newUser);
             localStorage.setItem('users', JSON.stringify(users));
-            alert("Cadastro realizado com sucesso! Faça login.");
+            alert("Cadastro realizado com sucesso! Você ganhou 30 dias de acesso gratuito.");
             switchAuthView('loginView');
         }
 
@@ -1392,12 +1545,17 @@
         }
 
         function handleGoogleLogin() {
-            // Mock Google Login - Simulation only
+            // Mock Google Login
             alert("Simulação: Conectando com Google... (Em um ambiente real, isso abriria o OAuth)");
             const mockUser = {
                 name: "Usuário Google Exemplo",
                 email: "google.user@gmail.com",
-                type: "google"
+                type: "google",
+                // Google user também ganha 30 dias na simulação se for novo
+                license: {
+                    expiration: new Date().setDate(new Date().getDate() + 30),
+                    lastAccess: Date.now()
+                }
             };
             loginSuccess(mockUser);
         }
@@ -1436,7 +1594,6 @@
                     localStorage.setItem('users', JSON.stringify(users));
                     alert("Senha alterada com sucesso!");
                     switchAuthView('loginView');
-                    // Reset fields
                     document.getElementById('forgotStep1').style.display = 'block';
                     document.getElementById('forgotStep2').style.display = 'none';
                 }
@@ -1446,8 +1603,54 @@
         }
 
         function loginSuccess(user) {
+            // REGRA 6: Admin tem 9999 dias
+            if (user.email === 'jcnvap@gmail.com') {
+                const now = new Date();
+                const farFuture = new Date(now);
+                farFuture.setDate(now.getDate() + 9999);
+                
+                user.license = {
+                    expiration: farFuture.getTime(),
+                    lastAccess: now.getTime()
+                };
+                updateUserStorage(user);
+            }
+
+            // REGRA 5: Verificação de data retroativa e validade
+            const nowTime = Date.now();
+            
+            // Garantir estrutura de licença para usuários legados
+            if(!user.license) {
+                const exp = new Date();
+                exp.setDate(exp.getDate() + 30);
+                user.license = { expiration: exp.getTime(), lastAccess: nowTime };
+            }
+
+            // Bloquear se a data atual for menor que o último acesso (tentativa de voltar relógio)
+            if (nowTime < user.license.lastAccess) {
+                alert("Erro de segurança: A data do sistema é anterior ao último acesso registrado. Corrija o relógio do seu dispositivo.");
+                return;
+            }
+
+            // Atualizar último acesso
+            user.license.lastAccess = nowTime;
+            updateUserStorage(user);
             currentUser = user;
+            
+            // Verifica se a licença expirou
+            if (nowTime > user.license.expiration) {
+                authScreen.style.display = 'none';
+                lockScreen.style.display = 'flex'; // Mostra tela de bloqueio
+                return;
+            }
+
+            // Login bem-sucedido
+            proceedToApp(user);
+        }
+
+        function proceedToApp(user) {
             authScreen.style.display = 'none';
+            lockScreen.style.display = 'none';
             appContainer.style.display = 'block'; 
             document.querySelector('.nav-buttons').style.display = 'flex';
             document.querySelector('header').style.display = 'block';
@@ -1457,12 +1660,27 @@
             reportUserSpan.textContent = user.name;
             localStorage.setItem('activeUser', JSON.stringify(user));
 
-            // Controle de Visibilidade do Botão IA
+            updateDaysBadge();
+
             const btnAi = document.querySelector('.btn-ai');
             if (user.email === 'jcnvap@gmail.com') {
                 btnAi.style.display = 'inline-flex';
             } else {
-                btnAi.style.display = 'none';
+                btnAi.style.display = 'inline-flex'; // Libera para todos verem a melhoria, conforme solicitação da regra 7
+            }
+        }
+
+        function updateUserStorage(updatedUser) {
+            const users = JSON.parse(localStorage.getItem('users') || "[]");
+            const index = users.findIndex(u => u.email === updatedUser.email);
+            if (index !== -1) {
+                users[index] = updatedUser;
+                localStorage.setItem('users', JSON.stringify(users));
+            }
+            // Atualiza activeUser se for ele
+            if (currentUser && currentUser.email === updatedUser.email) {
+                currentUser = updatedUser;
+                localStorage.setItem('activeUser', JSON.stringify(updatedUser));
             }
         }
 
@@ -1477,6 +1695,97 @@
             if(active) {
                 loginSuccess(JSON.parse(active));
             }
+        }
+
+        // --- SISTEMA DE BLOQUEIO E CONTRA-SENHA ---
+
+        function generateRandomCode() {
+            // REGRA 3: Gerar número entre 100 e 1000
+            generatedRandomNumber = Math.floor(Math.random() * 901) + 100;
+            const display = document.getElementById('displayRandomCode');
+            display.textContent = generatedRandomNumber;
+            display.style.display = 'block';
+        }
+
+        function validateUnlock() {
+            const input = document.getElementById('unlockInput').value.trim();
+            // Formato XXXXX-YYY
+            const parts = input.split('-');
+            
+            if (parts.length !== 2) {
+                alert("Formato inválido. Use XXXXX-YYY.");
+                return;
+            }
+
+            const codeInput = parseInt(parts[0]);
+            const daysInput = parseInt(parts[1]);
+
+            if (isNaN(codeInput) || isNaN(daysInput)) {
+                alert("O código e os dias devem ser números.");
+                return;
+            }
+
+            // REGRA 3: Fórmula (R + 13) * 9 + 1954
+            const expectedCode = (generatedRandomNumber + CONST_ADD) * CONST_MULT + CONST_BASE;
+
+            if (codeInput === expectedCode) {
+                // Desbloqueio com sucesso
+                const now = new Date();
+                const newExpiration = new Date(now);
+                newExpiration.setDate(now.getDate() + daysInput);
+                
+                currentUser.license.expiration = newExpiration.getTime();
+                currentUser.license.lastAccess = now.getTime();
+                
+                updateUserStorage(currentUser);
+                
+                alert(`Acesso liberado com sucesso por mais ${daysInput} dias!`);
+                
+                // Remove input para segurança e recarrega
+                document.getElementById('unlockInput').value = "";
+                document.getElementById('displayRandomCode').style.display = 'none';
+                
+                proceedToApp(currentUser);
+            } else {
+                alert("Contra-senha inválida.");
+            }
+        }
+
+        function openLockScreenForRenewal() {
+            closeSettings();
+            appContainer.style.display = 'none';
+            document.querySelector('.nav-buttons').style.display = 'none';
+            document.querySelector('header').style.display = 'none';
+            lockScreen.style.display = 'flex';
+        }
+
+        // --- CONFIGURAÇÕES E VISUALIZAÇÃO DE DIAS ---
+        function updateDaysBadge() {
+            if (!currentUser) return;
+            const now = Date.now();
+            const diff = currentUser.license.expiration - now;
+            const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            
+            const badge = document.getElementById('daysBadge');
+            badge.textContent = daysLeft > 0 ? `${daysLeft}d` : '0d';
+        }
+
+        function openSettings() {
+            const modal = document.getElementById('settingsModal');
+            const now = Date.now();
+            const exp = currentUser.license.expiration;
+            const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+            
+            document.getElementById('settingsUser').textContent = currentUser.name;
+            document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo" : "Expirado";
+            document.getElementById('settingsDate').textContent = new Date(exp).toLocaleDateString();
+            document.getElementById('settingsDaysLeft').textContent = daysLeft;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
         }
 
         // --- APP LOGIC START ---
@@ -1677,13 +1986,6 @@
             }
         }
 
-        function clearData() {
-            if(confirm("Tem certeza que deseja apagar todos os dados preenchidos?")) {
-                localStorage.removeItem("consultoriaData");
-                location.reload();
-            }
-        }
-
         function generateReport() {
             const reportSection = document.getElementById("reportSection");
             const reportContent = document.getElementById("reportContent");
@@ -1695,7 +1997,7 @@
             
             // Texto Padrão (Sem IA)
             document.querySelector('#adviceSection h2').innerText = "Próximos Passos";
-            document.getElementById("adviceContent").innerHTML = "<p>Gere um backup e envie para análise.</p>";
+            document.getElementById("adviceContent").innerHTML = "<p>Gere um plano de ação clicando no botão abaixo.</p>";
             
             const now = new Date();
             document.getElementById("reportDate").innerText = now.toLocaleDateString() + " às " + now.toLocaleTimeString();
@@ -1756,7 +2058,7 @@
             window.scrollTo(0,0);
         }
 
-        // --- NOVA LÓGICA DE IA / CONSULTORIA AVANÇADA (ATUALIZADO) ---
+        // --- REGRA 7: MELHORIA NO PLANO DE AÇÃO (IA SIMULADA) ---
         function generateAdvice() {
             const data = JSON.parse(localStorage.getItem("consultoriaData") || "{}");
             const adviceContainer = document.getElementById("adviceContent");
@@ -1770,93 +2072,81 @@
             const segmento = (data.empresa_segmento || "").toLowerCase();
 
             // Helper para identificar varejo/comércio
-            const isVarejo = ["varejo", "loja", "comércio", "comercio", "venda", "produto", "roupa", "confecção", "eletrônico"].some(keyword => segmento.includes(keyword));
+            const isVarejo = ["varejo", "loja", "comércio", "comercio", "venda", "produto", "roupa", "confecção", "eletrônico", "mercado"].some(keyword => segmento.includes(keyword));
 
             // 0. INTRODUÇÃO
             html += `<div class="advice-intro">
                 <strong>Prezado Gestor da ${nomeEmpresa},</strong><br><br>
-                Com base nos dados coletados em seu diagnóstico, elaboramos um plano de ação focado na eficiência operacional e expansão estratégica. 
-                Seguindo as melhores práticas do mercado, este relatório prioriza a proteção do caixa (curto prazo) e a construção de ativos digitais (médio prazo).
+                Como consultor financeiro e estratégico, analisei as respostas fornecidas no diagnóstico. Abaixo, apresento um plano de ação estruturado, priorizando o saneamento financeiro imediato e a expansão através de canais digitais modernos, fundamentais no cenário atual.
             </div>`;
 
             // 1. CORTE DE CUSTOS E EFICIÊNCIA (MANDATÓRIO)
             let costsAdvice = `<h4>1. Otimização de Custos e Saneamento Financeiro</h4>`;
-            costsAdvice += `<p>O primeiro passo para qualquer crescimento sustentável é estancar sangrias financeiras. Execute estas ações em até 10 dias:</p>`;
+            costsAdvice += `<p>Antes de investir em crescimento, precisamos garantir que a operação seja "enxuta". Ações imediatas (Próximos 10 dias):</p>`;
             costsAdvice += `<ul>`;
-            costsAdvice += `<li><strong>Auditoria de Assinaturas (SaaS/Serviços):</strong> Liste todas as recorrências no cartão de crédito da empresa. Cancele softwares, clubes ou ferramentas não utilizados nos últimos 45 dias.</li>`;
-            costsAdvice += `<li><strong>Renegociação de Telefonia e Internet:</strong> Contratos com mais de 12 meses geralmente possuem defasagem de preço. Ligue para o provedor solicitando atualização para planos vigentes (mais baratos ou mais rápidos).</li>`;
-            costsAdvice += `<li><strong>Eficiência Operacional:</strong> Implemente política de "Desperdício Zero". Troque iluminação por LED (redução de até 30% na luz), revise torneiras/vazamentos e digitalize documentos para reduzir custos com impressão e papel.</li>`;
+            costsAdvice += `<li><strong>Revisão de Assinaturas e Recorrências:</strong> Realize um "pente fino" no cartão de crédito corporativo. Cancele softwares, clubes de assinatura ou serviços que não foram utilizados nos últimos 45 dias.</li>`;
+            costsAdvice += `<li><strong>Renegociação de Telefonia e Internet:</strong> Planos de telecomunicação costumam ficar obsoletos em 12 meses. Ligue para as operadoras solicitando atualização para planos vigentes (geralmente mais rápidos e baratos).</li>`;
+            costsAdvice += `<li><strong>Eficiência Energética e Operacional:</strong> Avalie custos com energia. A troca por lâmpadas LED e sensores de presença pode reduzir a conta em até 20%. Institua política de "desperdício zero" com materiais de escritório e insumos.</li>`;
             
             if(data.fin_controle !== "Sim") {
-                costsAdvice += `<li><strong>Renegociação de Contratos:</strong> Com a inflação de serviços, revise contratos de aluguel e fornecedores principais. Use cotações de concorrentes como alavanca de negociação.</li>`;
+                costsAdvice += `<li><strong>Controle de Fornecedores:</strong> Seus dados indicam controle financeiro parcial/ausente. Renegocie prazos de pagamento com fornecedores estratégicos para aliviar o fluxo de caixa imediato.</li>`;
             }
             costsAdvice += `</ul>`;
 
             html += `<div class="advice-card">${costsAdvice}</div>`;
 
             // 2. DIAGNÓSTICO ESTRATÉGICO
-            let strategyAdvice = `<h4>2. Diagnóstico de Gestão e Processos</h4><ul>`;
-
+            let strategyAdvice = `<h4>2. Gestão e Processos</h4><ul>`;
             if(data.fin_controle === "Nao" || data.fin_controle === "Parcial") {
-                strategyAdvice += `<li>🚨 <strong>Implantação de DRE:</strong> Você opera com "voo cego" financeiro. Implemente imediatamente um DRE (Demonstrativo de Resultado) mensal para saber se o lucro é real ou contábil.</li>`;
+                strategyAdvice += `<li>🚨 <strong>Implantação de DRE Gerencial:</strong> Você está operando com risco elevado. Implemente imediatamente um DRE para visualizar Lucro Líquido real, separando o que é custo da empresa e o que é retirada dos sócios.</li>`;
             }
-
             if(data.fin_margem === "Nao") {
-                strategyAdvice += `<li>💰 <strong>Revisão de Precificação:</strong> Sem margem definida por produto, o aumento de vendas pode gerar aumento de prejuízo. Crie uma planilha de formação de preço considerando custos fixos + variáveis + impostos.</li>`;
+                strategyAdvice += `<li>💰 <strong>Precificação Inteligente:</strong> Sem saber a margem exata, vender mais pode significar quebrar mais rápido. Revise a precificação considerando todos os custos variáveis (impostos, taxas de cartão, comissões).</li>`;
             }
-
-            if(data.vendas_funil === "Nao") {
-                 strategyAdvice += `<li>🎯 <strong>Estruturação Comercial:</strong> Formalize seu Funil de Vendas. Defina etapas claras (ex: Lead > Qualificação > Proposta > Follow-up). A maioria das vendas é perdida por falta de acompanhamento.</li>`;
-            }
-            
             strategyAdvice += `</ul>`;
             html += `<div class="advice-card">${strategyAdvice}</div>`;
 
-            // 3. ESTRATÉGIA DIGITAL E POSICIONAMENTO
-            let digitalAdvice = `<h4>3. Presença Digital e Posicionamento</h4><ul>`;
+            // 3. ESTRATÉGIA DIGITAL E POSICIONAMENTO (ATUALIZADO)
+            let digitalAdvice = `<h4>3. Presença Digital e Redes Sociais</h4><p>O mercado mudou. A atenção do cliente está no celular.</p><ul>`;
             
             // Instagram/Facebook
-            if(data.mkt_converte === "Nao" || data.mkt_converte === "Pouco") {
-                digitalAdvice += `<li>📱 <strong>Instagram & Facebook (Meta):</strong> Sua rede social não deve ser apenas vitrine. Mude a estratégia para "Conteúdo de Conversão": mostre bastidores, prova social (clientes felizes) e quebre objeções. Use Stories para engajamento e Reels para alcance.</li>`;
-            } else {
-                 digitalAdvice += `<li>📱 <strong>Escala em Social Media:</strong> Já que suas redes convertem, profissionalize o calendário editorial e inicie testes com tráfego pago para públicos semelhantes (Lookalike) aos seus compradores.</li>`;
-            }
-
+            digitalAdvice += `<li>📱 <strong>Instagram & Facebook Profissional:</strong> Não use apenas como vitrine. Produza conteúdo que quebre objeções de compra. Utilize <em>Reels</em> para alcance (topo de funil) e <em>Stories</em> para conexão e venda (fundo de funil).</li>`;
+            
             // Google Meu Negócio
             if(data.seo_gmn === "Nao") {
-                digitalAdvice += `<li>📍 <strong>Google Meu Negócio (GMN):</strong> É a ferramenta de vendas gratuita mais poderosa para negócios locais. Cadastre sua empresa, preencha tudo (horários, fotos reais) e solicite avaliações de clientes satisfeitos para ranquear no topo das buscas locais.</li>`;
+                digitalAdvice += `<li>📍 <strong>Google Meu Negócio (Urgente):</strong> Cadastre sua empresa imediatamente. É a forma mais barata de ser encontrado localmente. Preencha tudo, adicione fotos de alta qualidade e peça avaliações para clientes satisfeitos.</li>`;
             } else {
-                 digitalAdvice += `<li>📍 <strong>Otimização GMN:</strong> Responda a todas as avaliações no Google (positivas e negativas) e poste fotos novas semanalmente. Isso sinaliza atividade ao algoritmo e melhora seu posicionamento.</li>`;
+                 digitalAdvice += `<li>📍 <strong>Otimização do Google Perfil:</strong> Mantenha o perfil ativo com postagens semanais de ofertas e fotos novas. Responda a todas as avaliações (boas ou ruins) para melhorar seu ranqueamento orgânico.</li>`;
             }
             
             digitalAdvice += `</ul>`;
             html += `<div class="advice-card">${digitalAdvice}</div>`;
 
-            // 4. INFRAESTRUTURA DE VENDAS ONLINE
-            let webAdvice = `<h4>4. Infraestrutura de Vendas e Tráfego</h4><ul>`;
+            // 4. INFRAESTRUTURA DE VENDAS ONLINE E TRÁFEGO
+            let webAdvice = `<h4>4. Canais de Venda e Tráfego Pago</h4><ul>`;
 
             // Landing Pages
-            if(data.promo_frequencia !== "Raramente") {
-                webAdvice += `<li>🚀 <strong>Landing Pages Específicas:</strong> Para suas campanhas e promoções, não mande o cliente para a "Home" do site. Crie Landing Pages dedicadas com oferta única e botão de compra claro para aumentar a taxa de conversão.</li>`;
-            }
+            webAdvice += `<li>🚀 <strong>Landing Pages para Promoções:</strong> Ao fazer campanhas, não envie o cliente para a "home" do site. Crie Landing Pages específicas focadas em conversão para o produto ofertado. Isso aumenta drasticamente o ROI.</li>`;
 
             // Site / Loja Virtual
             if(data.site_possui === "Nao" && isVarejo) {
-                webAdvice += `<li>🛒 <strong>E-commerce Próprio:</strong> Depender apenas de redes sociais é arriscado. Inicie uma loja virtual básica (plataformas como Nuvemshop ou Shopify) para ter controle sobre seus dados e clientes.</li>`;
-            } else if (data.site_possui === "Sim") {
-                webAdvice += `<li>🔧 <strong>Otimização de Site (CRO):</strong> Revise a velocidade do seu site e a facilidade do checkout. Cada segundo de demora no carregamento reduz a conversão em até 20%.</li>`;
+                webAdvice += `<li>🛒 <strong>Criação de Loja Virtual (E-commerce):</strong> Para não depender de algoritmos, inicie uma loja própria (plataformas como Nuvemshop/Shopify/Wix). Comece simples, mas tenha um canal proprietário.</li>`;
             }
 
             // Marketplaces
-            if(data.mktp_vende === "Nao" && isVarejo) {
-                webAdvice += `<li>📦 <strong>Estratégia de Marketplaces:</strong> Para quem busca escala rápida, entrar no Mercado Livre, Shopee ou Amazon é essencial. Eles já possuem o tráfego; você só precisa do produto e preço competitivo.</li>`;
-            } else if (data.mktp_vende === "Sim" && data.mktp_estoque === "Nao") {
-                webAdvice += `<li>🔄 <strong>Integração de Estoque (Hub):</strong> Vender em múltiplos canais sem integração (Bling/Tiny) causará ruptura de estoque (furo). Automatize isso urgentemente para evitar penalizações nas plataformas.</li>`;
+            if(isVarejo) {
+                if(data.mktp_vende === "Nao") {
+                    webAdvice += `<li>📦 <strong>Expansão para Marketplaces:</strong> Entre no Mercado Livre, Shopee e Amazon. Eles possuem o tráfego que você não tem. Use-os como canal de aquisição de novos clientes, mesmo que a margem seja menor.</li>`;
+                } else {
+                    webAdvice += `<li>🔄 <strong>Integração de Estoque (Hub):</strong> Se já vende em marketplaces, use um HUB (ex: Bling/Tiny) para unificar o estoque e evitar furos que penalizam sua conta.</li>`;
+                }
             }
 
-            // Tráfego Pago vs Orgânico
-            if(data.ads_investe === "Sim" && data.ads_cpl === "Nao") {
-                 webAdvice += `<li>💸 <strong>Auditoria de Tráfego Pago:</strong> Investir sem medir o CPA (Custo por Aquisição) é queimar dinheiro. Instale o Pixel do Facebook/Google e pause campanhas que não trazem ROI comprovado.</li>`;
+            // Tráfego Pago
+            if(data.ads_investe === "Nao") {
+                 webAdvice += `<li>💸 <strong>Início em Tráfego Pago:</strong> O alcance orgânico é limitado. Separe uma verba de teste para Google Ads (fundo de funil/intensão de compra) e Meta Ads (descoberta). Comece pequeno, mas comece.</li>`;
+            } else {
+                 webAdvice += `<li>📊 <strong>Otimização de Tráfego:</strong> Foque no CAC (Custo de Aquisição de Cliente). Se o custo estiver alto, revise os criativos e a segmentação do público.</li>`;
             }
             
             webAdvice += `</ul>`;
@@ -1864,18 +2154,18 @@
 
             // 5. IMPORTAÇÃO E SOURCING (Apenas para Varejo)
             if(isVarejo) {
-                let chinaAdvice = `<h4>5. Estratégia de Sourcing (Importação)</h4>`;
-                chinaAdvice += `<p>Para aumentar margens de lucro no varejo, a redução do Custo da Mercadoria Vendida (CMV) é vital.</p><ul>`;
-                chinaAdvice += `<li>🌏 <strong>Viabilidade de Importação da China:</strong> Analise produtos da Curva A (mais vendidos). Se o volume permitir, a importação direta (mesmo via LCL - container compartilhado) pode aumentar sua margem bruta em 100-300% comparado à compra local.</li>`;
-                chinaAdvice += `<li>🏷️ <strong>Private Label:</strong> Considere importar produtos genéricos e aplicar sua marca própria para fugir da guerra de preços de commodities nos marketplaces.</li>`;
+                let chinaAdvice = `<h4>5. Estratégia de Importação Direta</h4>`;
+                chinaAdvice += `<p>Para aumentar a competitividade e margem de lucro a médio/longo prazo:</p><ul>`;
+                chinaAdvice += `<li>🌏 <strong>Importação da China:</strong> Avalie a viabilidade de importar seus produtos "Curva A" diretamente. Mesmo operações simplificadas (como "Importa Fácil") ou containers compartilhados (LCL) podem reduzir o custo do produto em mais de 50% comparado à compra de distribuidores locais.</li>`;
+                chinaAdvice += `<li>🏷️ <strong>Private Label:</strong> Considere importar produtos "white label" e aplicar sua marca. Isso evita a guerra de preços direta com concorrentes que vendem exatamente o mesmo item nos marketplaces.</li>`;
                 chinaAdvice += `</ul>`;
                 html += `<div class="advice-card">${chinaAdvice}</div>`;
             }
 
             // CONCLUSÃO
             html += `<div class="advice-intro" style="margin-top:20px; border-left: 4px solid var(--primary-color);">
-                <strong>Conclusão:</strong><br>
-                Este plano prioriza ações de baixo custo e alto impacto. Comece pelo saneamento de custos (item 1) nesta semana. Em paralelo, ajuste sua presença no Google (item 3). A partir do próximo mês, foque na estruturação de vendas online (item 4).
+                <strong>Conclusão Profissional:</strong><br>
+                Este plano combina a prudência financeira necessária (cortes de custos e controle) com a agressividade comercial digital (Ads, Marketplaces, Importação). Execute as ações de custo na primeira semana e inicie a estruturação digital no mês corrente.
             </div>`;
             
             adviceContainer.innerHTML = html;
