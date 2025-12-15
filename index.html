@@ -47,7 +47,7 @@
 
     <script>
     // --- 1. VERIFICAÇÃO DE SEGURANÇA (MANTIDA) ---
-    // Aguarda o DOM estar pronto para evitar erro "Cannot set properties of null"
+    // Aguarda o DOM estar pronto para evitar erros de carregamento
     window.addEventListener('DOMContentLoaded', () => {
         if (window.location.protocol === 'file:') {
             document.body.innerHTML = `
@@ -67,8 +67,8 @@
     });
     
     // --- 2. CONFIGURAÇÃO DA API KEY (GLOBAL) ---
-    // CHAVE INSERIDA CORRETAMENTE ABAIXO
-    const GEMINI_API_KEY = "AIzaSyDQCcZx0QQPuV2OTdEcRDnKDuRcg44DFaY"; 
+    // Chave inserida conforme solicitado
+    const GEMINI_API_KEY = "AIzaSyAyMJMCQNNaP1B5G1U3yUj3rNDQVjvx9tw"; 
 
     // --- 3. FUNÇÃO DO GEMINI ---
     async function gerarPlanoComGemini() {
@@ -108,11 +108,11 @@
         try {
             // Verifica se a chave é válida antes de tentar
             if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("COLE_SUA_CHAVE")) {
-                throw new Error("Chave de API inválida. Edite o arquivo HTML e insira sua chave 'AIza...' na variável GEMINI_API_KEY.");
+                throw new Error("Chave de API inválida. Edite o arquivo HTML e verifique a variável GEMINI_API_KEY.");
             }
 
-            // Usa o modelo gemini-1.5-flash (mais rápido/estável)
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // ALTERADO PARA 'gemini-pro' (Modelo mais estável que evita o erro "not found")
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -2470,3 +2470,5 @@ try {
 </body>
 </html>
 ```
+181,3s
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
