@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <!-- Adicione isso no <head> -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+	
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diagnóstico Empresarial - Firebase Real</title>
@@ -44,7 +47,7 @@
             flex-direction: column;
         }
 		
-	<!--  // AQUI
+		<!--  // AQUI -->
 		<script>
     // Verifica se está rodando via arquivo local (file://)
     if (window.location.protocol === 'file:') {
@@ -66,7 +69,7 @@
     }
    </script>
    
- AQUI não permite rodar o html-->
+<!--  // AQUI não permite rodar o html-->
 
         /* --- AUTH SCREEN STYLES --- */
         #authScreen {
@@ -2092,68 +2095,47 @@ const firebaseConfig = {
             window.scrollTo(0, 0);
         }
 
+// aqui Inicio
         // --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
- // --- INTEGRAÇÃO COM DEEPSEEK API ---
+// --- SUBSTITUA A FUNÇÃO generateAdvice EXISTENTE POR ESTA ---
+
 async function generateAdvice() {
-    // 1. CONFIGURAÇÃO
-    const DEEPSEEK_API_KEY = "sk-2ee0f3e891bd4e58ad2f14475b739f25"; // <--- COLE SUA CHAVE AQUI
+    // 1. Configuração
+    const DEEPSEEK_API_KEY = "SUA_CHAVE_API_AQUI"; // <--- COLOQUE SUA CHAVE AQUI
     const API_URL = "https://api.deepseek.com/chat/completions";
-
-    showLoading();
     
-    // 2. PREPARAÇÃO DOS DADOS (Contexto para a IA)
-    const data = currentUser.diagnosisData || {};
+    // Verifica se tem dados
+    if (!currentUser || !currentUser.diagnosisData) {
+        alert("Nenhum dado encontrado para gerar o plano.");
+        return;
+    }
+
+    showLoading(); // Mostra o spinner
+
+    // 2. Preparar os dados para a IA (Contexto)
+    const data = currentUser.diagnosisData;
+    const nomeEmpresa = data.empresa_nome || "Empresa";
     
-    // Monta um texto legível com todos os dados para a IA ler
-    let contextoEmpresa = `
-        Nome: ${data.empresa_nome || "Não informado"}
-        Segmento: ${data.empresa_segmento || "Não informado"}
-        Tempo de mercado: ${data.empresa_tempo || "0"} anos
-        Funcionários: ${data.empresa_funcionarios || "0"}
-        Faturamento Mensal: R$ ${data.empresa_faturamento || "0"}
-        Regime: ${data.empresa_regime || "Não informado"}
-        Público: ${data.empresa_publico || "Não informado"}
-        Controle Financeiro: ${data.fin_controle || "Não informado"}
-        Custos Fixos: R$ ${data.fin_custos_fixos || "0"}
-        Dívidas: ${data.fin_dividas || "Não possui"}
-        Marketing/Ads: Investe? ${data.ads_investe || "Não"}. Valor: R$ ${data.ads_valor || "0"}
-        Problema Principal relatado: ${data.obj_problemas || "Não informado"}
-        Objetivo: ${data.obj_principal || "Não informado"}
-    `;
+    // Transformamos o objeto JSON em uma string legível para a IA
+    const dadosFormatados = JSON.stringify(data, null, 2);
 
-    // 3. CRIAÇÃO DO PROMPT (As instruções para a IA)
-    const prompt = `
-        Você é um consultor empresarial sênior especializado em reestruturação financeira e crescimento.
-        Analise os dados da seguinte empresa:
-        ${contextoEmpresa}
-
-        Gere um "Plano de Ação Estratégico" profissional, direto e prático.
+    // 3. Montar o Prompt (Instrução do Sistema e do Usuário)
+    const promptSystem = `
+        Você é um Consultor Empresarial Sênior especialista em reestruturação financeira e estratégia.
+        Analise os dados JSON fornecidos de uma empresa.
         
-        REGRAS DE FORMATAÇÃO:
-        - A resposta DEVE ser estritamente em formato HTML (sem tag <html>, <head> ou <body>, apenas o conteúdo interno como <div>, <h4>, <ul>, <li>, <p>).
-        - Use a classe "advice-card" para agrupar blocos (ex: <div class="advice-card">...</div>).
-        - Não use Markdown (nada de ** ou ##), use tags HTML (<b>, <h4>).
-
-        ESTRUTURA OBRIGATÓRIA DA RESPOSTA:
-        1. Resumo da Situação: Uma análise breve de 2 linhas sobre o momento da empresa.
-        2. Saneamento Financeiro (Foco em Cortes):
-           - Sugira cortes de custos específicos (assinaturas, energia, telefonia) e renegociações baseadas no porte da empresa.
-           - Se não tiver controle financeiro, enfatize a urgência do DRE.
-        3. Estratégia Digital & Vendas:
-           - Ações para Instagram/Facebook/Google Meu Negócio.
-           - Otimização de conversão (Landing Pages, Site).
-           - Tráfego Pago vs Orgânico (recomende com base no faturamento atual).
-        4. Oportunidade de Importação/Sourcing:
-           - Se for comércio/varejo, analise se vale a pena importar da China ou buscar fornecedores diretos. Se for serviço, ignore este ponto.
+        Sua tarefa:
+        1. Identificar os 3 maiores problemas baseados nos dados (financeiro, vendas, processos).
+        2. Criar um Plano de Ação Prático com 3 a 5 passos imediatos.
+        3. Ser direto, profissional e usar formatação Markdown (negrito, listas).
+        4. O tom deve ser encorajador mas realista.
+        5. Não use introduções genéricas, vá direto ao ponto.
     `;
+
+    const promptUser = `Aqui estão os dados da empresa ${nomeEmpresa}: \n\n ${dadosFormatados}`;
 
     try {
-        const adviceContent = document.getElementById("adviceContent");
-        const adviceHeader = document.querySelector('#adviceSection h2');
-        
-        adviceHeader.innerText = "Gerando Análise com IA...";
-        
-        // 4. CHAMADA À API (FETCH)
+        // 4. Chamada à API (Fetch)
         const response = await fetch(API_URL, {
             method: "POST",
             headers: {
@@ -2161,53 +2143,61 @@ async function generateAdvice() {
                 "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
             },
             body: JSON.stringify({
-                model: "deepseek-chat", // Modelo V3 (Rápido e Inteligente)
+                model: "deepseek-chat", // Modelo da DeepSeek
                 messages: [
-                    { 
-                        role: "system", 
-                        content: "Você é um assistente especialista em consultoria empresarial que responde exclusivamente em HTML formatado para web." 
-                    },
-                    { 
-                        role: "user", 
-                        content: prompt 
-                    }
+                    { role: "system", content: promptSystem },
+                    { role: "user", content: promptUser }
                 ],
                 temperature: 0.7, // Criatividade equilibrada
-                max_tokens: 1500  // Limite de tamanho da resposta
+                max_tokens: 1500  // Limite da resposta
             })
         });
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || "Erro na API DeepSeek");
+            const errorDetails = await response.json();
+            throw new Error(`Erro na API: ${errorDetails.error?.message || response.statusText}`);
         }
 
-        const json = await response.json();
-        const aiResponseHTML = json.choices[0].message.content;
-
-        // 5. EXIBIÇÃO DO RESULTADO
-        // Remove marcadores de código se a IA mandar (```html ... ```)
-        const cleanHTML = aiResponseHTML.replace(/```html/g, '').replace(/```/g, '');
-
-        adviceHeader.innerText = "Plano de Ação Estratégico (DeepSeek AI)";
-        adviceContent.innerHTML = `<div class="advice-intro">Análise gerada em tempo real baseada nos seus dados.</div>` + cleanHTML;
+        const jsonResponse = await response.json();
         
-        // Rola a tela até o conselho
+        // 5. Pegar o texto da resposta
+        const aiText = jsonResponse.choices[0].message.content;
+
+        // 6. Atualizar a Interface (Renderizar Markdown para HTML)
+        const adviceHeader = document.querySelector('#adviceSection h2');
+        adviceHeader.innerText = "Consultoria Inteligente (DeepSeek AI)";
+
+        // Se adicionou a lib 'marked' no passo 1, use marked.parse(aiText). 
+        // Se não, use apenas aiText (mas a formatação ficará crua).
+        const htmlContent = typeof marked !== 'undefined' 
+            ? marked.parse(aiText) 
+            : `<pre style="white-space: pre-wrap;">${aiText}</pre>`;
+
+        document.getElementById("adviceContent").innerHTML = `
+            <div class="advice-card">
+                ${htmlContent}
+            </div>
+            <div style="text-align:center; margin-top:10px; font-size:0.8rem; color:#777;">
+                Gerado por Inteligência Artificial (DeepSeek V3). Revise antes de aplicar.
+            </div>
+        `;
+
+        // Rolar até a seção
         document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
 
     } catch (error) {
         console.error("Erro na IA:", error);
-        alert("Falha ao gerar conselho com IA: " + error.message);
-        document.getElementById("adviceContent").innerHTML = `<p style="color:red">Erro ao conectar com o consultor virtual. Verifique sua chave API ou conexão.</p>`;
+        alert("Ocorreu um erro ao gerar a consultoria: " + error.message);
     } finally {
-        hideLoading();
+        hideLoading(); // Esconde o spinner
     }
 }
-        
+
 		
 		
-		
-		// --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
+		// fim
+
+        // --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
         function backupData() {
             if(!currentUser) return;
             // Cria arquivo JSON com os dados atuais do usuário
