@@ -1625,6 +1625,7 @@ function exibirPlanoNaTela(texto) {
 
             <div class="action-bar">
                 <button class="btn-ai" onclick="generateAdvice()">💡 Gerar Plano de Ação (IA)</button>
+								
                 <button class="btn-backup" onclick="backupData()">💾 Backup</button>
                 <button class="btn-restore" onclick="restoreData()">📂 Restore</button>
                 <input type="file" id="restoreInput" style="display:none" onchange="handleFileSelect(event)">
@@ -1640,8 +1641,8 @@ function exibirPlanoNaTela(texto) {
     </footer>
 
     <script>
-        // --- 1. CONFIGURAÇÃO DO FIREBASE (SUBSTITUA AQUI) ---
-        // Você pega isso no Console do Firebase > Configurações do Projeto > Geral > Seus aplicativos
+    // --- 1. CONFIGURAÇÃO DO FIREBASE (SUBSTITUA AQUI) ---
+   // Você pega isso no Console do Firebase > Configurações do Projeto > Geral > Seus aplicativos
 const firebaseConfig = {
   apiKey: "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM",
   authDomain: "diagnostico-a2247.firebaseapp.com",
@@ -1850,7 +1851,12 @@ try {
             proceedToApp();
         }
 
-        function proceedToApp() {
+         function proceedToApp() {
+            // --- CORREÇÃO APLICADA AQUI ---
+            // Garante que o spinner de carregamento suma ao entrar no app
+            hideLoading(); 
+            // ------------------------------
+
             authScreen.style.display = 'none';
             lockScreen.style.display = 'none';
             appContainer.style.display = 'block'; 
@@ -1870,7 +1876,7 @@ try {
 
             // Regra 7: Botão IA visível para todos
             const btnAi = document.querySelector('.btn-ai');
-            btnAi.style.display = 'inline-flex';
+            if(btnAi) btnAi.style.display = 'inline-flex';
         }
 
         function handleLogout() {
@@ -2190,6 +2196,12 @@ try {
             // Se necessário, rola para o topo
             window.scrollTo(0, 0);
         }
+
+
+
+
+
+
 
         // --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
         async function generateAdvice() {
