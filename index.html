@@ -533,17 +533,24 @@ const firebaseConfig = {
 };
 
 // Inicializa Firebase
+// --- CÓDIGO CORRIGIDO PARA INICIALIZAR O FIREBASE ---
+        
+        // Variáveis do Firebase
         let auth, db;
+
         try {
-            // Inicializa diretamente usando a configuração definida acima
+            // Inicializa diretamente sem verificar "if"
             firebase.initializeApp(firebaseConfig);
+            
+            // Ativa os serviços
             auth = firebase.auth();
             db = firebase.firestore();
+            
             console.log("Firebase inicializado com sucesso!");
-        } catch (e) { 
-            console.error("Erro ao inicializar Firebase:", e);
-            alert("Erro crítico no Firebase. Verifique o console (F12).");
-        }		
+        } catch (e) {
+            console.error("Erro fatal no Firebase:", e);
+            alert("Erro ao iniciar Firebase: " + e.message);
+        }	
 
         // Variáveis Globais
         let currentUser = null;
