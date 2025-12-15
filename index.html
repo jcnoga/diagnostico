@@ -1560,26 +1560,28 @@ const firebaseConfig = {
   measurementId: "G-6R39CB3R52"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
-
 
         // Inicializa Firebase
-        let auth, db;
-        try {
-            if (firebaseConfig.apiKey !== "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM") {
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-                console.log("Firebase inicializado com sucesso");
-            } else {
-                console.warn("Firebase Config não preenchido. As funcionalidades de nuvem não funcionarão.");
-            }
-        } catch (e) {
-            console.error("Erro ao inicializar Firebase:", e);
-        }
+// --- CÓDIGO ATUALIZADO (Substitua o bloco antigo por este) ---
+
+// Variáveis globais para guardar a autenticação e o banco
+let auth, db;
+
+try {
+    // Inicializa o Firebase direto, sem perguntar nada
+    const app = firebase.initializeApp(firebaseConfig);
+    
+    // Pega as instâncias de Auth e Firestore
+    auth = firebase.auth();
+    db = firebase.firestore();
+    
+    console.log("✅ Firebase iniciado com sucesso!");
+
+} catch (e) {
+    // Se der erro aqui, vai aparecer vermelho no console
+    console.error("❌ Erro fatal ao iniciar Firebase:", e);
+    alert("Erro técnico: Veja o console (F12) para detalhes.");
+}
 
         // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
         const CONST_ADD = 13;
