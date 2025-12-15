@@ -1565,23 +1565,27 @@ const firebaseConfig = {
 // --- CÓDIGO ATUALIZADO (Substitua o bloco antigo por este) ---
 
 // Variáveis globais para guardar a autenticação e o banco
-let auth, db;
+// --- CÓDIGO CORRIGIDO ---
+
+let auth, db; // Variáveis globais
 
 try {
-    // Inicializa o Firebase direto, sem perguntar nada
-    const app = firebase.initializeApp(firebaseConfig);
+    // ERRADO (O que deve estar causando o erro):
+    // initializeApp(firebaseConfig); 
     
-    // Pega as instâncias de Auth e Firestore
+    // CORRETO (Adicione 'firebase.' na frente):
+    firebase.initializeApp(firebaseConfig); 
+    
+    // Inicializa os serviços
     auth = firebase.auth();
     db = firebase.firestore();
     
-    console.log("✅ Firebase iniciado com sucesso!");
+    console.log("✅ Firebase inicializado com sucesso!");
 
 } catch (e) {
-    // Se der erro aqui, vai aparecer vermelho no console
-    console.error("❌ Erro fatal ao iniciar Firebase:", e);
-    alert("Erro técnico: Veja o console (F12) para detalhes.");
+    console.error("❌ Erro ao inicializar:", e);
 }
+
 
         // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
         const CONST_ADD = 13;
