@@ -43,123 +43,125 @@
             display: flex;
             flex-direction: column;
         }
-		
+    </style>
 
-	<script>
-    // Verifica se está rodando via arquivo local (file://)
-    if (window.location.protocol === 'file:') {
-        // Pára o carregamento e exibe mensagem de erro
-        document.body.innerHTML = `
-            <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
-                <div>
-                    <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
-                    <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e conexão com o Firebase, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
-                    <hr style="border-color:#555; margin:20px 0;">
-                    <p><strong>Como resolver:</strong></p>
-                    <p>Utilize um servidor local (ex: VS Code Live Server, XAMPP, Python http.server)<br>ou hospede a aplicação na web.</p>
-                    <p style="color:#f1c40f; margin-top:15px;">O endereço deve começar com <strong>http://</strong> ou <strong>https://</strong></p>
+    <script>
+    // --- 1. VERIFICAÇÃO DE SEGURANÇA (CORRIGIDA) ---
+    // Aguarda o DOM estar pronto para evitar erro "Cannot set properties of null"
+    window.addEventListener('DOMContentLoaded', () => {
+        if (window.location.protocol === 'file:') {
+            document.body.innerHTML = `
+                <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
+                    <div>
+                        <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
+                        <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e conexão com o Firebase, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
+                        <hr style="border-color:#555; margin:20px 0;">
+                        <p><strong>Como resolver:</strong></p>
+                        <p>Utilize um servidor local (ex: VS Code Live Server, XAMPP, Python http.server)<br>ou hospede a aplicação na web.</p>
+                        <p style="color:#f1c40f; margin-top:15px;">O endereço deve começar com <strong>http://</strong> ou <strong>https://</strong></p>
+                    </div>
                 </div>
-            </div>
-        `;
-        // Lança um erro para parar a execução do restante dos scripts
-        throw new Error("Execução via file:// bloqueada por segurança.");
-    }
-	
-	
-	
-	//xxxxxxxxxxxxxxxxxxxxxx
-	// Cole sua API Key do Gemini aqui
-const GEMINI_API_KEY = "AIzaSyAyMJMCQNNaP1B5G1U3yUj3rNDQVjvx9tw";
-
-async function gerarPlanoComGemini() {
-    
-    // 1. Pegar os dados do formulário (AJUSTE OS IDs CONFORME SEU HTML)
-    const empresa = document.getElementById('nomeEmpresa')?.value || "Sua Empresa";
-    const segmento = document.getElementById('segmento')?.value || "Geral";
-    const tempo = document.getElementById('tempoAtuacao')?.value || "Não informado";
-    const funcionarios = document.getElementById('numFuncionarios')?.value || "Não informado";
-    // Pegue outros campos se houver (faturamento, desafios, etc.)
-
-    // 2. Montar o Prompt (O comando para a IA)
-    const prompt = `
-        Aja como um consultor empresarial sênior.
-        Crie um Diagnóstico e Plano de Ação Estratégico para a seguinte empresa:
-        
-        - Nome: ${empresa}
-        - Ramo de Atuação: ${segmento}
-        - Tempo de Mercado: ${tempo}
-        - Número de Funcionários: ${funcionarios}
-
-        O plano deve conter:
-        1. Análise da situação atual (baseado no ramo).
-        2. 3 Pontos fortes prováveis e 3 Pontos fracos comuns nesse setor.
-        3. Um plano de ação prático com 5 etapas para crescimento.
-        4. Sugestão de tecnologias para modernizar o negócio.
-
-        Use formatação clara, com tópicos. Responda em Português do Brasil.
-    `;
-
-    // Mostra um loading (se você tiver uma função showLoading(), chame ela aqui)
-    console.log("Gerando plano com IA...");
-    alert("Aguarde, a Inteligência Artificial está analisando sua empresa...");
-
-    try {
-        // 3. Chamar a API do Gemini
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }]
-            })
-        });
-
-        const data = await response.json();
-
-        // 4. Pegar a resposta
-        if (data.candidates && data.candidates.length > 0) {
-            const planoGerado = data.candidates[0].content.parts[0].text;
-            
-            console.log("Plano Gerado:", planoGerado);
-            
-            // 5. Exibir na tela e Salvar no Firebase
-            exibirPlanoNaTela(planoGerado);
-            salvarNoFirebase(planoGerado); // Função opcional se quiser salvar
-        } else {
-            alert("A IA não conseguiu gerar uma resposta. Tente novamente.");
+            `;
+            throw new Error("Execução via file:// bloqueada por segurança.");
         }
-
-    } catch (error) {
-        console.error("Erro ao chamar Gemini:", error);
-        alert("Erro de conexão com a IA.");
-    }
-}
-
-// Função auxiliar para mostrar o resultado na tela
-function exibirPlanoNaTela(texto) {
-    // Você precisa ter uma DIV ou TEXTAREA no seu HTML com id="resultadoPlano"
-    const divResultado = document.getElementById('resultadoPlano');
+    });
     
-    if (divResultado) {
-        // Converte quebras de linha para HTML (opcional)
-        divResultado.innerHTML = texto.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        divResultado.scrollIntoView({ behavior: 'smooth' });
-    } else {
-        alert("Plano Gerado! (Veja no console F12 pois não achei a div de resultado)");
-        console.log(texto);
+    // --- 2. CONFIGURAÇÃO DA API KEY (GLOBAL) ---
+    // COLE SUA CHAVE ABAIXO DENTRO DAS ASPAS
+    const GEMINI_API_KEY = "COLE_SUA_CHAVE_AIZA_AQUI"; 
+
+    // --- 3. FUNÇÃO DO GEMINI ---
+    async function gerarPlanoComGemini() {
+        // Função auxiliar para pegar valores
+        const getVal = (name) => document.querySelector(`[name="${name}"]`)?.value || "Não informado";
+        
+        const empresa = getVal('empresa_nome');
+        const segmento = getVal('empresa_segmento');
+        const tempo = getVal('empresa_tempo');
+        const funcionarios = getVal('empresa_funcionarios');
+        const problemas = document.querySelector('[name="obj_problemas"]')?.value || "";
+
+        // Prompt para a IA
+        const prompt = `
+            Aja como um consultor empresarial sênior.
+            Crie um Diagnóstico e Plano de Ação Estratégico Alternativo para a seguinte empresa:
+            
+            - Nome: ${empresa}
+            - Ramo de Atuação: ${segmento}
+            - Tempo de Mercado: ${tempo} anos
+            - Número de Funcionários: ${funcionarios}
+            - Principais Problemas relatados: ${problemas}
+
+            O plano deve conter:
+            1. Análise da situação atual.
+            2. 3 Pontos fortes e 3 Pontos fracos.
+            3. Plano de ação prático com 5 etapas.
+            4. Sugestão de tecnologias.
+
+            Use formatação HTML clara (h3, b, ul, li). Responda em Português do Brasil.
+        `;
+
+        console.log("Gerando plano com IA (Gemini)...");
+        const loading = document.getElementById('loadingOverlay');
+        if(loading) loading.style.display = 'flex';
+
+        try {
+            // Verifica se a chave é válida antes de tentar
+            if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("COLE_SUA_CHAVE")) {
+                throw new Error("Chave de API inválida. Edite o arquivo HTML e insira sua chave 'AIza...' na variável GEMINI_API_KEY.");
+            }
+
+            // Usa o modelo gemini-1.5-flash (mais rápido/estável)
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                console.error("Erro da API:", data.error);
+                throw new Error(data.error.message);
+            }
+
+            if (data.candidates && data.candidates.length > 0) {
+                const planoGerado = data.candidates[0].content.parts[0].text;
+                exibirPlanoNaTela(planoGerado);
+            } else {
+                alert("A IA não conseguiu gerar uma resposta. Tente novamente.");
+            }
+
+        } catch (error) {
+            console.error("Erro ao chamar Gemini:", error);
+            alert("Erro: " + error.message);
+        } finally {
+            if(loading) loading.style.display = 'none';
+        }
     }
-}
-	
-	//xxxxxxxxxxxxxxxxxxxxxx
+
+    function exibirPlanoNaTela(texto) {
+        const divResultado = document.getElementById('resultadoPlano');
+        document.getElementById("reportSection").style.display = "block";
+        
+        if (divResultado) {
+            // Converte Markdown básico para HTML e exibe
+            let htmlTexto = texto
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            
+            divResultado.innerHTML = `
+                <div style="background:#fff; padding:20px; border:2px solid #e67e22; border-radius:8px; margin-top:20px;">
+                    <h2 style="color:#e67e22;">🤖 Resultado do Teste Gemini</h2>
+                    ${htmlTexto}
+                </div>
+            `;
+            divResultado.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
    </script>
    
-<!--  // AQUI não permite rodar o html-->
-
+    <style>
         /* --- AUTH SCREEN STYLES --- */
         #authScreen {
             position: fixed;
@@ -1622,10 +1624,14 @@ function exibirPlanoNaTela(texto) {
                     <p>Gere um backup e envie para análise.</p>
                 </div>
             </div>
+            
+            <!-- Div para resultado do Gemini -->
+            <div id="resultadoPlano"></div>
 
             <div class="action-bar">
                 <button class="btn-ai" onclick="generateAdvice()">💡 Gerar Plano de Ação (IA)</button>
-								
+                <!-- Botão de teste solicitado -->
+                <button class="btn-demo" style="background-color:#e67e22; color:white; border:none;" onclick="gerarPlanoComGemini()">🧪 Teste Gemini (API)</button>
                 <button class="btn-backup" onclick="backupData()">💾 Backup</button>
                 <button class="btn-restore" onclick="restoreData()">📂 Restore</button>
                 <input type="file" id="restoreInput" style="display:none" onchange="handleFileSelect(event)">
@@ -1641,8 +1647,8 @@ function exibirPlanoNaTela(texto) {
     </footer>
 
     <script>
-    // --- 1. CONFIGURAÇÃO DO FIREBASE (SUBSTITUA AQUI) ---
-   // Você pega isso no Console do Firebase > Configurações do Projeto > Geral > Seus aplicativos
+        // --- 1. CONFIGURAÇÃO DO FIREBASE (SUBSTITUA AQUI) ---
+        // Você pega isso no Console do Firebase > Configurações do Projeto > Geral > Seus aplicativos
 const firebaseConfig = {
   apiKey: "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM",
   authDomain: "diagnostico-a2247.firebaseapp.com",
@@ -1851,11 +1857,8 @@ try {
             proceedToApp();
         }
 
-       function proceedToApp() {
-            // --- CORREÇÃO APLICADA AQUI ---
-            // Garante que o spinner de carregamento suma ao entrar no app
-            hideLoading(); 
-            // ------------------------------
+        function proceedToApp() {
+            hideLoading(); // Correção: Garante que o loading saia ao entrar no app
 
             authScreen.style.display = 'none';
             lockScreen.style.display = 'none';
@@ -2197,12 +2200,6 @@ try {
             window.scrollTo(0, 0);
         }
 
-
-
-
-
-
-
         // --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
         async function generateAdvice() {
             showLoading();
@@ -2470,9 +2467,7 @@ try {
         }
 
     </script>
-	<div id="resultadoPlano" style="padding: 20px; background: #f4f4f4; margin-top: 20px; border-radius: 10px; white-space: pre-wrap;">
-    <!-- O plano aparecerá aqui -->
-</div>
 </body>
 </html>
 ```
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
