@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico Empresarial - AI Edition</title>
+    <title>Diagnóstico Empresarial - AI Edition (CORS Fix)</title>
     
     <!-- FIREBASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -47,17 +47,16 @@
             flex-direction: column;
         }
 		
-		/* Proteção contra execução via file:// */
+		/* Bloqueio de execução local para evitar problemas */
 		<script>
         if (window.location.protocol === 'file:') {
             document.body.innerHTML = `
                 <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
                     <div>
                         <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
-                        <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e CORS, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
+                        <p>Para usar a IA e o Firebase, este arquivo não pode rodar via "file://".</p>
                         <hr style="border-color:#555; margin:20px 0;">
-                        <p><strong>Como resolver:</strong></p>
-                        <p>Utilize um servidor local (ex: VS Code Live Server) ou hospede na web.</p>
+                        <p>Use um servidor local (Live Server no VS Code) ou hospede na Vercel/Netlify.</p>
                     </div>
                 </div>
             `;
@@ -65,7 +64,7 @@
         }
        </script>
 
-        /* --- AUTH SCREEN STYLES --- */
+        /* --- AUTH SCREEN --- */
         #authScreen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
@@ -522,28 +521,29 @@
 
     <script>
         // --- 1. CONFIGURAÇÃO DO FIREBASE ---
-        // COLOQUE SUAS CREDENCIAIS AQUI
-        const firebaseConfig = {
-            apiKey: "SUA_API_KEY_DO_FIREBASE",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            projectId: "SEU_PROJETO_ID",
-            storageBucket: "SEU_PROJETO.firebasestorage.app",
-            messagingSenderId: "SEU_MESSAGING_ID",
-            appId: "SEU_APP_ID"
-        };
+        // COLOQUE SUAS CREDENCIAIS AQUI (COPIAR DO CONSOLE DO FIREBASE)
+const firebaseConfig = {
+  apiKey: "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM",
+  authDomain: "diagnostico-a2247.firebaseapp.com",
+  projectId: "diagnostico-a2247",
+  storageBucket: "diagnostico-a2247.firebasestorage.app",
+  messagingSenderId: "125978207628",
+  appId: "1:125978207628:web:f5135603051550de1fe2a9",
+  measurementId: "G-6R39CB3R52"
+};
 
-        // Inicializa Firebase
+// Inicializa Firebase
         let auth, db;
         try {
-            if (firebaseConfig.apiKey !== "SUA_API_KEY_DO_FIREBASE") {
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-                console.log("Firebase OK");
-            } else {
-                console.warn("⚠️ Firebase não configurado no código.");
-            }
-        } catch (e) { console.error("Erro Firebase:", e); }
+            // Inicializa diretamente usando a configuração definida acima
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            console.log("Firebase inicializado com sucesso!");
+        } catch (e) { 
+            console.error("Erro ao inicializar Firebase:", e);
+            alert("Erro crítico no Firebase. Verifique o console (F12).");
+        }		
 
         // Variáveis Globais
         let currentUser = null;
@@ -615,7 +615,6 @@
 
         async function loginSuccess(uid, userData) {
             const now = Date.now();
-            // Validação simples de expiração
             if(now > userData.license.expiration) {
                 currentUser = { uid: uid, ...userData };
                 authScreen.style.display = 'none';
@@ -623,7 +622,6 @@
                 hideLoading();
                 return;
             }
-            // Atualiza acesso
             await db.collection("users").doc(uid).update({ "license.lastAccess": now });
             currentUser = { uid: uid, ...userData };
             proceedToApp();
@@ -638,10 +636,7 @@
             document.getElementById('reportUser').textContent = currentUser.name;
             updateDaysBadge();
 
-            // Carrega dados salvos
             if(currentUser.diagnosisData) loadFormData(currentUser.diagnosisData);
-            
-            // Exibe botão AI
             document.querySelector('.btn-ai').style.display = 'inline-flex';
         }
 
@@ -666,7 +661,7 @@
             const data = {};
             formData.forEach((value, key) => data[key] = value);
             
-            currentUser.diagnosisData = data; // Atualiza local
+            currentUser.diagnosisData = data;
             const cloud = document.querySelector('.cloud-status');
             if(cloud) cloud.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Salvando...`;
             
@@ -785,7 +780,7 @@
                     let label = input.closest('.form-group')?.querySelector('label')?.innerText.replace('*','') || input.name;
                     
                     if(input.type === 'radio') {
-                        if(!input.checked) return; // Só mostra o selecionado
+                        if(!input.checked) return;
                     } else if(input.tagName === 'SELECT') {
                         val = input.options[input.selectedIndex].text;
                     }
@@ -803,69 +798,70 @@
             currentStep = 0; showStep(0);
         }
 
-        // --- DEEPSEEK AI INTEGRATION ---
-        async function generateAdvice() {
-            // ******************************************************
-            // COLOQUE SUA CHAVE DA DEEPSEEK (OU OPENAI) ABAIXO
-            const DEEPSEEK_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; 
-            // ******************************************************
-            
-            const API_URL = "https://api.deepseek.com/chat/completions";
 
-            if(!currentUser || !currentUser.diagnosisData) return alert("Preencha o formulário primeiro.");
-            if(DEEPSEEK_API_KEY.includes("xxxx")) return alert("Erro: Chave de API não configurada no código.");
 
-            showLoading();
+// --- SUBSTITUA A FUNÇÃO generateAdvice POR ESTA VERSÃO CORRIGIDA ---
 
-            const data = currentUser.diagnosisData;
-            const systemPrompt = `Você é um Consultor Empresarial Sênior. Analise o JSON abaixo e crie um plano de ação estratégico.
-            Seja direto, profissional e use Markdown (negrito, listas). 
-            Estrutura da resposta: 
-            1. Diagnóstico Resumido (3 pontos críticos)
-            2. Estratégia Financeira (Corte de custos e precificação)
-            3. Estratégia de Vendas e Marketing (Ações práticas)
-            4. Conclusão Motivacional.`;
+async function generateAdvice() {
+    // 1. COLOQUE SUA CHAVE DO GOOGLE AI STUDIO AQUI:
+    const GOOGLE_API_KEY = "AIzaSyAyMJMCQNNaP1B5G1U3yUj3rNDQVjvx9tw"; 
+    
+    // CORREÇÃO: Mudamos para 'gemini-1.5-flash-latest' que é a versão estável atual
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GOOGLE_API_KEY}`;
 
-            const userPrompt = `Dados da empresa: ${JSON.stringify(data)}`;
+    if(!currentUser || !currentUser.diagnosisData) return alert("Preencha o formulário primeiro.");
+    
+    showLoading();
 
-            try {
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: "deepseek-chat",
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: userPrompt }
-                        ],
-                        temperature: 0.7,
-                        max_tokens: 2000
-                    })
-                });
+    const data = currentUser.diagnosisData;
+    
+    // Montando o prompt
+    const promptText = `
+        Você é um Consultor Empresarial Sênior. 
+        Analise os dados JSON abaixo desta empresa e crie um plano de ação.
+        
+        DADOS DA EMPRESA:
+        ${JSON.stringify(data)}
 
-                if (!response.ok) throw new Error("Erro na API da IA: " + response.statusText);
+        REGRAS DA RESPOSTA:
+        1. Seja direto e profissional.
+        2. Use formatação Markdown (negrito, tópicos).
+        3. A estrutura deve ser:
+           - Diagnóstico Resumido (3 pontos críticos)
+           - Plano de Ação (Financeiro e Vendas)
+           - Conclusão.
+    `;
 
-                const json = await response.json();
-                const aiText = json.choices[0].message.content;
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: promptText }]
+                }]
+            })
+        });
 
-                // Renderiza Markdown para HTML usando a lib 'marked'
-                const htmlContent = marked.parse(aiText);
-
-                document.getElementById("adviceContent").innerHTML = `
-                    <div class="advice-card">${htmlContent}</div>
-                    <small style="display:block; text-align:center; color:#888; margin-top:10px">Gerado por Inteligência Artificial</small>
-                `;
-                
-            } catch (error) {
-                console.error(error);
-                alert("Erro ao gerar consultoria: " + error.message);
-            } finally {
-                hideLoading();
-            }
+        if (!response.ok) {
+            const errTxt = await response.text();
+            throw new Error(`Erro Google API: ${response.status}. Detalhes: ${errTxt}`);
         }
+
+        const json = await response.json();
+        
+        // Caminho específico da resposta do Gemini
+        const aiText = json.candidates[0].content.parts[0].text;
+
+        // Converte Markdown para HTML
+        const htmlContent = marked.parse(aiText);
+
+        document.getElementById("adviceContent").innerHTML = `
+            <div cl
+
+
 
         // --- BACKUP & RESTORE ---
         function backupData() {
@@ -888,7 +884,7 @@
                     loadFormData(data);
                     await saveToFirebase();
                     alert("Restaurado com sucesso!");
-                    editForm(); // Volta para o form para conferir
+                    editForm();
                 } catch(err) { alert("Arquivo inválido"); }
             };
             r.readAsText(file);
