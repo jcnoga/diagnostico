@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <!-- Adicione isso no <head> -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-	
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnóstico Empresarial - Firebase Real</title>
+    <title>Diagnóstico Empresarial - AI Edition</title>
     
     <!-- FIREBASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <!-- MARKDOWN PARSER (Para formatar a resposta da IA) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
         :root {
@@ -47,704 +47,228 @@
             flex-direction: column;
         }
 		
-		<!--  // AQUI -->
+		/* Proteção contra execução via file:// */
 		<script>
-    // Verifica se está rodando via arquivo local (file://)
-    if (window.location.protocol === 'file:') {
-        // Pára o carregamento e exibe mensagem de erro
-        document.body.innerHTML = `
-            <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
-                <div>
-                    <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
-                    <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e conexão com o Firebase, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
-                    <hr style="border-color:#555; margin:20px 0;">
-                    <p><strong>Como resolver:</strong></p>
-                    <p>Utilize um servidor local (ex: VS Code Live Server, XAMPP, Python http.server)<br>ou hospede a aplicação na web.</p>
-                    <p style="color:#f1c40f; margin-top:15px;">O endereço deve começar com <strong>http://</strong> ou <strong>https://</strong></p>
+        if (window.location.protocol === 'file:') {
+            document.body.innerHTML = `
+                <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
+                    <div>
+                        <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
+                        <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e CORS, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
+                        <hr style="border-color:#555; margin:20px 0;">
+                        <p><strong>Como resolver:</strong></p>
+                        <p>Utilize um servidor local (ex: VS Code Live Server) ou hospede na web.</p>
+                    </div>
                 </div>
-            </div>
-        `;
-        // Lança um erro para parar a execução do restante dos scripts
-        throw new Error("Execução via file:// bloqueada por segurança.");
-    }
-   </script>
-   
-<!--  // AQUI não permite rodar o html-->
+            `;
+            throw new Error("Execução via file:// bloqueada.");
+        }
+       </script>
 
         /* --- AUTH SCREEN STYLES --- */
         #authScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-            z-index: 2000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            z-index: 2000; display: flex; justify-content: center; align-items: center; padding: 20px;
         }
-
         .auth-card {
-            background: white;
-            width: 100%;
-            max-width: 400px;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            text-align: center;
+            background: white; width: 100%; max-width: 400px; padding: 30px;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center;
         }
-
-        .auth-card h2 {
-            color: var(--primary-color);
-            margin-bottom: 10px;
-        }
-
-        .auth-card p {
-            color: #666;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-
+        .auth-card h2 { color: var(--primary-color); margin-bottom: 10px; }
+        .auth-card p { color: #666; margin-bottom: 20px; font-size: 0.9rem; }
         .auth-form input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px;
         }
-
         .auth-btn {
-            width: 100%;
-            padding: 12px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-bottom: 10px;
-            transition: var(--transition);
+            width: 100%; padding: 12px; background-color: var(--primary-color); color: white;
+            border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 10px; transition: var(--transition);
         }
+        .auth-btn:hover { background-color: var(--accent-color); }
+        .auth-links { margin-top: 15px; font-size: 0.85rem; }
+        .auth-links a { color: var(--secondary-color); text-decoration: none; cursor: pointer; margin: 0 5px; }
+        .auth-view { display: none; }
+        .auth-view.active { display: block; }
 
-        .auth-btn:hover {
-            background-color: var(--accent-color);
-        }
-
-        .google-btn {
-            background-color: white;
-            color: #555;
-            border: 1px solid #ddd;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            position: relative;
-        }
-
-        .google-btn::before {
-            content: '';
-            display: block;
-            width: 20px;
-            height: 20px;
-            background: url('https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg') no-repeat center center;
-            background-size: contain;
-        }
-
-        .google-btn:hover {
-            background-color: #f8f9fa;
-        }
-
-        .auth-links {
-            margin-top: 15px;
-            font-size: 0.85rem;
-        }
-
-        .auth-links a {
-            color: var(--secondary-color);
-            text-decoration: none;
-            cursor: pointer;
-            margin: 0 5px;
-        }
-
-        .auth-links a:hover {
-            text-decoration: underline;
-        }
-
-        .auth-view {
-            display: none;
-        }
-        .auth-view.active {
-            display: block;
-        }
-
-        /* --- LOCK SCREEN (LICENSING) --- */
+        /* --- LOCK SCREEN --- */
         #lockScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--lock-bg);
-            z-index: 3000;
-            display: none; /* Controlado via JS */
-            justify-content: center;
-            align-items: center;
-            color: white;
-            padding: 20px;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--lock-bg);
+            z-index: 3000; display: none; justify-content: center; align-items: center; color: white; padding: 20px;
         }
-
         .lock-content {
-            background: #2c3e50;
-            padding: 40px;
-            border-radius: 10px;
-            text-align: center;
-            max-width: 500px;
-            box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
-            border: 2px solid var(--secondary-color);
+            background: #2c3e50; padding: 40px; border-radius: 10px; text-align: center;
+            max-width: 500px; box-shadow: 0 0 30px rgba(233, 69, 96, 0.3); border: 2px solid var(--secondary-color);
         }
-
-        .lock-content h2 { color: var(--secondary-color); margin-bottom: 20px; }
-        .lock-content p { margin-bottom: 15px; color: #ecf0f1; }
-        
         .generated-code-display {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--demo-btn-color);
-            margin: 20px 0;
-            letter-spacing: 2px;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 5px;
+            font-size: 2rem; font-weight: bold; color: var(--demo-btn-color); margin: 20px 0;
+            letter-spacing: 2px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px;
         }
-
         .lock-btn {
-            background-color: var(--secondary-color);
-            color: white;
-            border: none; padding: 10px 20px;
-            border-radius: 5px; cursor: pointer;
-            font-size: 1rem; margin-top: 10px;
+            background-color: var(--secondary-color); color: white; border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer; font-size: 1rem; margin-top: 10px;
         }
 
         /* --- SETTINGS MODAL --- */
         #settingsModal {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2500;
-            display: none;
-            justify-content: center;
-            align-items: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8);
+            z-index: 2500; display: none; justify-content: center; align-items: center;
         }
         .settings-card {
-            background: white; width: 90%; max-width: 500px;
-            padding: 25px; border-radius: 10px; position: relative;
+            background: white; width: 90%; max-width: 500px; padding: 25px; border-radius: 10px; position: relative;
         }
         .close-settings {
-            position: absolute; top: 10px; right: 15px;
-            font-size: 1.5rem; cursor: pointer; color: #aaa;
+            position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #aaa;
         }
 
-        /* --- APP HEADER --- */
+        /* --- HEADER & LAYOUT --- */
         header {
-            background-color: var(--primary-color);
-            color: var(--white);
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            position: relative;
+            background-color: var(--primary-color); color: var(--white); padding: 20px;
+            text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative;
         }
-
-        header h1 {
-            font-size: 1.5rem;
-            margin-bottom: 5px;
-        }
-
         .user-welcome {
-            font-size: 0.85rem;
-            opacity: 0.9;
-            margin-top: 5px;
-            background: rgba(255,255,255,0.1);
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
+            font-size: 0.85rem; opacity: 0.9; margin-top: 5px; background: rgba(255,255,255,0.1);
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
         }
-
         .header-controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
+            position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; align-items: center;
         }
-
         .header-btn {
-            background: transparent;
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            font-size: 0.8rem;
-            padding: 5px 10px;
-            cursor: pointer;
-            transition: all 0.2s;
+            background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;
+            font-size: 0.8rem; padding: 5px 10px; cursor: pointer; transition: all 0.2s;
         }
-        
-        .header-btn:hover {
-            background: rgba(255,255,255,0.1);
-        }
-
+        .header-btn:hover { background: rgba(255,255,255,0.1); }
         .remaining-days-badge {
-            background-color: var(--demo-btn-color);
-            color: white;
-            font-size: 0.75rem;
-            padding: 2px 8px;
-            border-radius: 10px;
-            margin-left: 5px;
-            vertical-align: middle;
+            background-color: var(--demo-btn-color); color: white; font-size: 0.75rem;
+            padding: 2px 8px; border-radius: 10px; margin-left: 5px;
         }
-        
-        /* Cloud Status Indicator */
         .cloud-status {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.8rem;
-            color: var(--cloud-status-color);
-            background: rgba(0,0,0,0.2);
-            padding: 5px 10px;
-            border-radius: 15px;
-            margin-right: 10px;
+            display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--cloud-status-color);
+            background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 15px; margin-right: 10px;
         }
         .cloud-dot {
-            width: 8px; height: 8px;
-            background-color: var(--cloud-status-color);
-            border-radius: 50%;
-            display: inline-block;
-            box-shadow: 0 0 5px var(--cloud-status-color);
+            width: 8px; height: 8px; background-color: var(--cloud-status-color); border-radius: 50%; box-shadow: 0 0 5px var(--cloud-status-color);
         }
 
         /* Progress Bar */
         .progress-container {
-            width: 100%;
-            background-color: #ddd;
-            height: 10px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            width: 100%; background-color: #ddd; height: 10px; position: sticky; top: 0; z-index: 100;
         }
-
         .progress-bar {
-            height: 100%;
-            background-color: var(--secondary-color);
-            width: 0%;
-            transition: width 0.4s ease;
+            height: 100%; background-color: var(--secondary-color); width: 0%; transition: width 0.4s ease;
         }
 
         /* Main Container */
         .container {
-            max-width: 800px;
-            margin: 30px auto;
-            background: var(--white);
-            padding: 30px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            display: none; /* Escondido até login */
-            flex: 1;
+            max-width: 800px; margin: 30px auto; background: var(--white); padding: 30px;
+            border-radius: var(--border-radius); box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            display: none; flex: 1;
         }
 
         /* Steps */
-        .step {
-            display: none; 
-            animation: fadeIn 0.5s;
-        }
-
-        .step.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .step { display: none; animation: fadeIn 0.5s; }
+        .step.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .step-header {
-            border-bottom: 2px solid var(--light-bg);
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            color: var(--primary-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
+            border-bottom: 2px solid var(--light-bg); padding-bottom: 10px; margin-bottom: 20px;
+            color: var(--primary-color); display: flex; justify-content: space-between; align-items: center;
         }
 
         /* Form Fields */
-        .form-group {
-            margin-bottom: 20px;
-            position: relative;
-        }
-
-        label {
-            display: inline-block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--accent-color);
-        }
-
-        /* TOOLTIP (AJUDA) */
+        .form-group { margin-bottom: 20px; position: relative; }
+        label { display: inline-block; margin-bottom: 8px; font-weight: 600; color: var(--accent-color); }
+        
+        /* TOOLTIP */
         .help-icon {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 18px;
-            height: 18px;
-            background-color: #bbb;
-            color: white;
-            border-radius: 50%;
-            font-size: 12px;
-            font-weight: bold;
-            margin-left: 8px;
-            cursor: help;
-            position: relative;
-            vertical-align: middle;
+            display: inline-flex; justify-content: center; align-items: center; width: 18px; height: 18px;
+            background-color: #bbb; color: white; border-radius: 50%; font-size: 12px; font-weight: bold;
+            margin-left: 8px; cursor: help; position: relative; vertical-align: middle;
         }
-
         .help-tooltip {
-            visibility: hidden;
-            width: 280px;
-            background-color: #333;
-            color: #fff;
-            text-align: left;
-            border-radius: 6px;
-            padding: 10px;
-            position: absolute;
-            z-index: 1000;
-            bottom: 135%;
-            left: 50%;
-            transform: translateX(-10%); 
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 0.85rem;
-            font-weight: normal;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            line-height: 1.4;
+            visibility: hidden; width: 280px; background-color: #333; color: #fff; text-align: left;
+            border-radius: 6px; padding: 10px; position: absolute; z-index: 1000; bottom: 135%; left: 50%;
+            transform: translateX(-10%); opacity: 0; transition: opacity 0.3s; font-size: 0.85rem; font-weight: normal;
         }
+        .help-icon:hover .help-tooltip { visibility: visible; opacity: 1; }
 
-        .help-tooltip::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 10%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #333 transparent transparent transparent;
+        input[type="text"], input[type="number"], input[type="email"], input[type="password"],
+        select, textarea {
+            width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: var(--border-radius); font-size: 1rem;
         }
+        textarea { resize: vertical; min-height: 100px; }
 
-        .help-icon:hover .help-tooltip,
-        .help-icon:focus .help-tooltip {
-            visibility: visible;
-            opacity: 1;
+        .radio-group { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px; }
+        .radio-option {
+            display: flex; align-items: center; gap: 5px; cursor: pointer; background: #f9f9f9;
+            padding: 10px 15px; border-radius: 20px; border: 1px solid #ddd;
         }
+        .radio-option:hover { background: #eef; }
 
-        input[type="text"],
-        input[type="number"],
-        input[type="email"],
-        input[type="password"],
-        input[type="date"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            transition: var(--transition);
-        }
-
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--primary-color);
-            outline: none;
-            box-shadow: 0 0 5px rgba(15, 52, 96, 0.2);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        /* Radio & Checkbox Groups */
-        .radio-group, .checkbox-group {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-top: 5px;
-        }
-
-        .radio-option, .checkbox-option {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            cursor: pointer;
-            background: #f9f9f9;
-            padding: 10px 15px;
-            border-radius: 20px;
-            border: 1px solid #ddd;
-        }
-
-        .radio-option:hover, .checkbox-option:hover {
-            background: #eef;
-        }
-
-        /* Navigation Buttons */
-        .nav-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
-
+        /* Buttons */
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
         button {
-            padding: 12px 25px;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: bold;
-            transition: var(--transition);
+            padding: 12px 25px; border: none; border-radius: var(--border-radius); cursor: pointer;
+            font-size: 1rem; font-weight: bold; transition: var(--transition);
         }
-
-        .btn-prev {
-            background-color: #ccc;
-            color: #333;
-        }
-
-        .btn-next {
-            background-color: var(--primary-color);
-            color: var(--white);
-        }
-
-        .btn-submit {
-            background-color: var(--secondary-color);
-            color: var(--white);
-        }
-
-        /* Custom Button Styles */
+        .btn-prev { background-color: #ccc; color: #333; }
+        .btn-next { background-color: var(--primary-color); color: var(--white); }
+        .btn-submit { background-color: var(--secondary-color); color: var(--white); }
         .btn-demo {
-            background-color: var(--white);
-            color: var(--demo-btn-color);
-            border: 2px solid var(--demo-btn-color);
-            padding: 5px 15px;
-            font-size: 0.85rem;
-            border-radius: 20px;
+            background-color: var(--white); color: var(--demo-btn-color); border: 2px solid var(--demo-btn-color);
+            padding: 5px 15px; font-size: 0.85rem; border-radius: 20px;
         }
-        .btn-demo:hover {
-            background-color: var(--demo-btn-color);
-            color: var(--white);
-        }
+        .btn-demo:hover { background-color: var(--demo-btn-color); color: var(--white); }
 
-        button:hover {
-            opacity: 0.9;
-            transform: translateY(-2px);
-        }
+        /* Report & AI Section */
+        #reportSection { display: none; }
+        .report-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid var(--primary-color); padding-bottom: 20px; }
+        .report-block { margin-bottom: 25px; page-break-inside: avoid; }
+        .report-block h3 { background-color: var(--light-bg); padding: 8px; border-left: 5px solid var(--primary-color); margin-bottom: 10px; }
+        .report-item { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px dotted #ccc; padding-bottom: 2px; }
 
-        button:disabled {
-            background-color: #eee;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* Report Section */
-        #reportSection {
-            display: none;
-        }
-
-        .report-header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 20px;
-        }
-
-        .report-block {
-            margin-bottom: 25px;
-            page-break-inside: avoid;
-        }
-
-        .report-block h3 {
-            background-color: var(--light-bg);
-            padding: 8px;
-            border-left: 5px solid var(--primary-color);
-            margin-bottom: 10px;
-        }
-
-        .report-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            border-bottom: 1px dotted #ccc;
-            padding-bottom: 2px;
-        }
-
-        .report-item strong {
-            width: 60%;
-        }
-        .report-item span {
-            width: 40%;
-            text-align: right;
-            color: #555;
-        }
-
-        /* Advice / AI Section */
         #adviceSection {
-            margin-top: 40px;
-            background-color: #eef2f7;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #d1d9e6;
-            margin-bottom: 20px;
+            margin-top: 40px; background-color: #eef2f7; padding: 20px; border-radius: 8px; border: 1px solid #d1d9e6; margin-bottom: 20px;
         }
-
-        #adviceSection h2 {
-            color: var(--primary-color);
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-
-        .advice-intro {
-            margin-bottom: 20px;
-            font-style: italic;
-            color: #555;
-            background: #fff;
-            padding: 10px;
-            border-radius: 4px;
-        }
-
+        #adviceSection h2 { color: var(--primary-color); margin-bottom: 15px; font-size: 1.2rem; }
         .advice-card {
-            background: white;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-left: 4px solid var(--secondary-color);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            white-space: pre-line; /* Permite quebras de linha */
+            background: white; padding: 20px; margin-bottom: 15px; border-left: 4px solid var(--secondary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); line-height: 1.6;
         }
-        
-        .advice-card h4 {
-            color: var(--primary-color);
-            margin-bottom: 8px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
+        /* Estilos Markdown */
+        .advice-card h3, .advice-card h4 { color: var(--primary-color); margin-top: 15px; margin-bottom: 10px; }
+        .advice-card ul, .advice-card ol { margin-left: 20px; margin-bottom: 15px; }
+        .advice-card li { margin-bottom: 5px; }
+        .advice-card strong { color: #333; }
 
-        .advice-card ul {
-            margin-left: 20px;
-            margin-top: 5px;
-        }
+        .action-bar { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; padding-bottom: 20px; }
+        .btn-ai { background-color: #8e44ad; color: white; display: none; align-items: center; gap: 8px; }
+        .btn-print { background-color: var(--accent-color); color: white; }
+        .btn-reset { background-color: #7f8c8d; color: white; }
+        .btn-backup { background-color: var(--backup-btn-color); color: white; }
+        .btn-restore { background-color: var(--restore-btn-color); color: white; }
 
-        .advice-card li {
-            margin-bottom: 5px;
-            font-size: 0.95rem;
-        }
-
-        .action-bar {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
-            flex-wrap: wrap;
-            padding-bottom: 20px;
-        }
-
-        .btn-print {
-            background-color: var(--accent-color);
-            color: white;
-        }
-
-        .btn-reset {
-            background-color: #7f8c8d;
-            color: white;
-        }
-
-        .btn-ai {
-            background-color: #8e44ad;
-            color: white;
-            display: none; /* Oculto por padrão, só aparece para Admin */
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-backup {
-            background-color: var(--backup-btn-color);
-            color: white;
-        }
-        
-        .btn-restore {
-            background-color: var(--restore-btn-color);
-            color: white;
-        }
-        
         /* Spinner */
         .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.7);
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7);
             display: none; justify-content: center; align-items: center; z-index: 9999;
         }
         .spinner {
-            border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color);
-            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-
-        /* Footer */
-        footer {
-            background-color: #333;
-            color: white;
-            text-align: center;
-            padding: 15px;
-            margin-top: auto;
-        }
-
-        footer a {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        footer a:hover {
-            color: var(--secondary-color);
-            text-decoration: underline;
-        }
-
-        .input-symbol-wrapper {
-            position: relative;
-        }
-        .input-symbol-wrapper::before {
-            content: "R$";
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #777;
-        }
-        .input-symbol-wrapper input {
-            padding-left: 35px;
-        }
+        /* Footer & Mobile */
+        footer { background-color: #333; color: white; text-align: center; padding: 15px; margin-top: auto; }
+        footer a { color: white; text-decoration: none; font-weight: bold; }
+        .input-symbol-wrapper { position: relative; }
+        .input-symbol-wrapper::before { content: "R$"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #777; }
+        .input-symbol-wrapper input { padding-left: 35px; }
 
         @media (max-width: 600px) {
             .container { margin: 10px; padding: 15px; }
             .radio-group { flex-direction: column; gap: 5px; }
-            .radio-option { width: 100%; }
-            .help-tooltip { left: -100px; width: 250px; }
-            .step-header { flex-direction: column; align-items: flex-start; }
-            .auth-card { padding: 20px; }
-            .header-controls { position: relative; top: 0; right: 0; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
-            .cloud-status { display: none; } /* Economizar espaço mobile */
+            .cloud-status { display: none; }
         }
-
         @media print {
             body { background-color: white; }
             header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer, .loading-overlay { display: none !important; }
@@ -752,13 +276,11 @@
             #diagnosisForm { display: none; }
             #reportSection { display: block !important; }
             #adviceSection { display: block !important; }
-            .report-item { font-size: 12px; }
         }
     </style>
 </head>
 <body>
 
-    <!-- OVERLAY DE CARREGAMENTO (Cloud Sim) -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
     </div>
@@ -766,8 +288,6 @@
     <!-- TELA DE AUTENTICAÇÃO -->
     <section id="authScreen">
         <div class="auth-card">
-            
-            <!-- View: Login -->
             <div id="loginView" class="auth-view active">
                 <h2>Bem-vindo</h2>
                 <p>Faça login com Firebase para acessar o diagnóstico.</p>
@@ -775,47 +295,31 @@
                     <input type="email" id="loginEmail" placeholder="Seu e-mail" required>
                     <input type="password" id="loginPass" placeholder="Sua senha" required>
                     <button type="submit" class="auth-btn">Entrar</button>
-                    <!-- Google Auth precisa ser habilitado no console do Firebase -->
-                    <button type="button" class="auth-btn google-btn" onclick="alert('Google Auth precisa ser habilitado no console do Firebase.')">
-                        Entrar com Google
-                    </button>
                 </form>
                 <div class="auth-links">
                     <a onclick="switchAuthView('forgotView')">Esqueci minha senha</a> |
                     <a onclick="switchAuthView('registerView')">Cadastrar conta</a>
                 </div>
             </div>
-
-            <!-- View: Cadastro -->
             <div id="registerView" class="auth-view">
-                <h2>Criar Conta Firebase</h2>
-                <p>Preencha seus dados para começar. Você ganhará 30 dias de acesso gratuito.</p>
+                <h2>Criar Conta</h2>
+                <p>Ganhe 30 dias de acesso gratuito.</p>
                 <form class="auth-form" onsubmit="handleRegister(event)">
                     <input type="text" id="regName" placeholder="Seu Nome Completo" required>
                     <input type="email" id="regEmail" placeholder="Seu E-mail" required>
-                    <input type="password" id="regPass" placeholder="Crie uma Senha (mín 6 dígitos)" required>
+                    <input type="password" id="regPass" placeholder="Senha (mín 6 dígitos)" required>
                     <button type="submit" class="auth-btn">Cadastrar</button>
                 </form>
-                <div class="auth-links">
-                    <a onclick="switchAuthView('loginView')">Já tenho conta. Fazer Login</a>
-                </div>
+                <div class="auth-links"><a onclick="switchAuthView('loginView')">Voltar ao Login</a></div>
             </div>
-
-            <!-- View: Esqueci Senha -->
             <div id="forgotView" class="auth-view">
                 <h2>Recuperar Senha</h2>
-                <p>Informe seu e-mail para receber um link de redefinição.</p>
                 <form class="auth-form" onsubmit="handleForgot(event)">
-                    <div id="forgotStep1">
-                        <input type="email" id="forgotEmail" placeholder="E-mail cadastrado" required>
-                        <button type="submit" class="auth-btn">Enviar E-mail</button>
-                    </div>
+                    <input type="email" id="forgotEmail" placeholder="E-mail cadastrado" required>
+                    <button type="submit" class="auth-btn">Enviar Link</button>
                 </form>
-                <div class="auth-links">
-                    <a onclick="switchAuthView('loginView')">Voltar ao Login</a>
-                </div>
+                <div class="auth-links"><a onclick="switchAuthView('loginView')">Voltar ao Login</a></div>
             </div>
-
         </div>
     </section>
 
@@ -823,19 +327,14 @@
     <section id="lockScreen">
         <div class="lock-content">
             <h2>⚠️ Acesso Expirado</h2>
-            <p>Seu período de utilização encerrou.</p>
-            <p>Para continuar utilizando, gere o código abaixo e informe a contra-senha.</p>
-            
-            <button class="lock-btn" onclick="generateRandomCode()">Gerar Código de Desbloqueio</button>
+            <p>Seu período encerrou. Gere o código e informe a contra-senha.</p>
+            <button class="lock-btn" onclick="generateRandomCode()">Gerar Código</button>
             <div id="displayRandomCode" class="generated-code-display" style="display:none;"></div>
-            
             <div style="margin-top: 20px;">
-                <label style="color:white; display:block;">Contra-senha (Formato: XXXXX-YYY)</label>
-                <input type="text" id="unlockInput" placeholder="Ex: 12345-30" style="text-align:center;">
+                <input type="text" id="unlockInput" placeholder="Ex: 12345-30" style="text-align:center; padding:10px; border-radius:5px; border:none; margin-bottom:10px;">
                 <button class="lock-btn" onclick="validateUnlock()">Liberar Acesso</button>
             </div>
-            
-            <button class="logout-btn" style="position:static; margin-top:20px; border-color:#999;" onclick="handleLogout()">Sair / Trocar Conta</button>
+            <button class="logout-btn" style="background:none; border:none; color:#bbb; text-decoration:underline; margin-top:20px; cursor:pointer;" onclick="handleLogout()">Sair da Conta</button>
         </div>
     </section>
 
@@ -843,39 +342,29 @@
     <div id="settingsModal">
         <div class="settings-card">
             <span class="close-settings" onclick="closeSettings()">&times;</span>
-            <h2>Configurações e Assinatura</h2>
+            <h2>Minha Assinatura</h2>
             <hr style="margin: 15px 0;">
             <p><strong>Usuário:</strong> <span id="settingsUser"></span></p>
             <p><strong>Status:</strong> <span id="settingsStatus"></span></p>
-            <p><strong>Validade da Licença:</strong> <span id="settingsDate"></span></p>
+            <p><strong>Validade:</strong> <span id="settingsDate"></span></p>
             <p style="font-size: 1.2rem; margin-top: 10px; color: var(--primary-color);">
                 <strong>Dias Restantes: </strong> <span id="settingsDaysLeft"></span>
             </p>
             <hr style="margin: 15px 0;">
-            <h3>Renovação Antecipada</h3>
-            <p style="font-size: 0.9rem; margin-bottom: 10px;">Caso deseje estender seu prazo antes do vencimento.</p>
             <button class="btn-demo" onclick="openLockScreenForRenewal()">Inserir Código de Renovação</button>
         </div>
     </div>
 
-    <!-- APLICAÇÃO PRINCIPAL -->
-    <div class="progress-container">
-        <div class="progress-bar" id="progressBar"></div>
-    </div>
+    <!-- APP PRINCIPAL -->
+    <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
 
     <header>
         <h1>Consultoria Estratégica & Financeira</h1>
-        <p>Sistema de Diagnóstico Empresarial - Firebase Edition</p>
+        <p>Sistema de Diagnóstico Empresarial - AI Edition</p>
         <div id="userWelcomeDisplay" class="user-welcome"></div>
-        
         <div class="header-controls">
-            <div class="cloud-status" title="Conexão Segura">
-                <span class="cloud-dot"></span> Firebase Conectado
-            </div>
-            <button class="header-btn" onclick="openSettings()">
-                Configurações 
-                <span id="daysBadge" class="remaining-days-badge"></span>
-            </button>
+            <div class="cloud-status" title="Conexão Segura"><span class="cloud-dot"></span> Firebase Conectado</div>
+            <button class="header-btn" onclick="openSettings()">Config <span id="daysBadge" class="remaining-days-badge"></span></button>
             <button class="header-btn" onclick="handleLogout()">Sair</button>
         </div>
     </header>
@@ -883,85 +372,39 @@
     <div class="container">
         <!-- FORMULÁRIO -->
         <form id="diagnosisForm">
-            <!-- Etapa 1: Dados Gerais -->
+            <!-- 1. Dados Gerais -->
             <div class="step active" data-title="Dados Gerais">
                 <div class="step-header">
                     <h2>1. Dados Gerais da Empresa</h2>
                     <button type="button" class="btn-demo" onclick="fillDemoData()">🧪 Preencher Teste</button>
                 </div>
                 <div class="form-group">
-                    <label>Nome da Empresa * 
-                        <span class="help-icon">?<span class="help-tooltip">Nome fantasia ou Razão Social da empresa. Ex: Padaria Pão Quente Ltda.</span></span>
-                    </label>
+                    <label>Nome da Empresa *</label>
                     <input type="text" name="empresa_nome" required>
                 </div>
                 <div class="form-group">
-                    <label>CNPJ
-                        <span class="help-icon">?<span class="help-tooltip">Cadastro Nacional da Pessoa Jurídica. Formato: 00.000.000/0000-00.</span></span>
-                    </label>
-                    <input type="text" name="empresa_cnpj" placeholder="00.000.000/0000-00">
+                    <label>Segmento / Atividade *</label>
+                    <input type="text" name="empresa_segmento" placeholder="Ex: Varejo de Roupas, Consultoria..." required>
                 </div>
                 <div class="form-group">
-                    <label>Segmento / Atividade Principal *
-                        <span class="help-icon">?<span class="help-tooltip">Qual o ramo do seu negócio? Ex: Varejo de Roupas, Consultoria de TI, Restaurante.</span></span>
-                    </label>
-                    <input type="text" name="empresa_segmento" required>
+                    <label>Faturamento Médio Mensal</label>
+                    <div class="input-symbol-wrapper"><input type="number" name="empresa_faturamento" step="0.01"></div>
                 </div>
                 <div class="form-group">
-                    <label>Tempo de Atuação (anos)
-                        <span class="help-icon">?<span class="help-tooltip">Há quantos anos a empresa está ativa no mercado?</span></span>
-                    </label>
-                    <input type="number" name="empresa_tempo" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Número de Funcionários
-                        <span class="help-icon">?<span class="help-tooltip">Total de colaboradores (CLT + PJ) que trabalham na operação.</span></span>
-                    </label>
-                    <input type="number" name="empresa_funcionarios" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Faturamento Médio Mensal
-                        <span class="help-icon">?<span class="help-tooltip">Média de vendas brutas dos últimos 6 meses.</span></span>
-                    </label>
-                    <div class="input-symbol-wrapper">
-                        <input type="number" name="empresa_faturamento" step="0.01">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Regime Tributário
-                        <span class="help-icon">?<span class="help-tooltip">Como sua empresa paga impostos? MEI, Simples Nacional, Lucro Presumido ou Real.</span></span>
-                    </label>
-                    <select name="empresa_regime">
-                        <option value="">Selecione...</option>
-                        <option value="MEI">MEI</option>
-                        <option value="Simples Nacional">Simples Nacional</option>
-                        <option value="Lucro Presumido">Lucro Presumido</option>
-                        <option value="Lucro Real">Lucro Real</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Público-alvo Principal
-                        <span class="help-icon">?<span class="help-tooltip">B2C = Vende para pessoas físicas. B2B = Vende para outras empresas.</span></span>
-                    </label>
+                    <label>Público-alvo Principal</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="empresa_publico" value="B2C"> Consumidor Final (B2C)</label>
+                        <label class="radio-option"><input type="radio" name="empresa_publico" value="B2C"> Consumidor (B2C)</label>
                         <label class="radio-option"><input type="radio" name="empresa_publico" value="B2B"> Empresas (B2B)</label>
                         <label class="radio-option"><input type="radio" name="empresa_publico" value="Hibrido"> Ambos</label>
                     </div>
                 </div>
             </div>
 
-            <!-- Etapa 2: Financeiro e Custos -->
+            <!-- 2. Financeiro -->
             <div class="step" data-title="Financeiro">
-                <div class="step-header">
-                    <h2>2. Financeiro e Custos</h2>
-                </div>
+                <div class="step-header"><h2>2. Financeiro e Custos</h2></div>
                 <div class="form-group">
-                    <label>Possui controle de custos detalhado? 
-                        <span class="help-icon">?
-                            <span class="help-tooltip">A empresa registra cada centavo gasto? Ex: Planilhas completas ou Software de Gestão.</span>
-                        </span>
-                    </label>
+                    <label>Possui controle de custos detalhado?</label>
                     <select name="fin_controle">
                         <option value="Nao">Não</option>
                         <option value="Parcial">Parcialmente</option>
@@ -969,314 +412,37 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Custos Fixos Mensais (Estimativa)
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Custos que não mudam se vender mais ou menos. Ex: Aluguel, Salários, Internet.</span>
-                        </span>
-                    </label>
-                    <div class="input-symbol-wrapper">
-                        <input type="number" name="fin_custos_fixos" step="0.01">
-                    </div>
+                    <label>Custos Fixos Mensais (Estimativa)</label>
+                    <div class="input-symbol-wrapper"><input type="number" name="fin_custos_fixos" step="0.01"></div>
                 </div>
                 <div class="form-group">
-                    <label>Custos Variáveis Principais
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Custos atrelados à venda. Ex: Matéria-prima, Taxa de cartão, Comissão.</span>
-                        </span>
-                    </label>
-                    <textarea name="fin_custos_variaveis" placeholder="Liste os principais..."></textarea>
+                    <label>Principais Custos Variáveis</label>
+                    <textarea name="fin_custos_variaveis" placeholder="Matéria-prima, taxas, comissões..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Existe controle de margem por produto/serviço?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Você sabe exatamente quanto lucra em cada item vendido, descontando todos os custos?</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="fin_margem" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="fin_margem" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Conhece o Ponto de Equilíbrio?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O valor mínimo que a empresa precisa faturar para pagar todas as contas (Zero a Zero).</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="fin_ponto_equilibrio" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="fin_ponto_equilibrio" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Possui Dívidas Atuais?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Empréstimos bancários, dívidas com fornecedores ou impostos atrasados.</span>
-                        </span>
-                    </label>
-                    <textarea name="fin_dividas" placeholder="Se sim, quais e valores aproximados..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Realiza Fluxo de Caixa Projetado?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Previsão das entradas e saídas futuras para saber se faltará dinheiro no fim do mês.</span>
-                        </span>
-                    </label>
-                    <select name="fin_fluxo_caixa">
-                        <option value="Nao">Não</option>
-                        <option value="Sim">Sim</option>
-                    </select>
+                    <label>Possui Dívidas Atuais? Descreva.</label>
+                    <textarea name="fin_dividas" placeholder="Empréstimos, fornecedores atrasados..."></textarea>
                 </div>
             </div>
 
-            <!-- Etapa 3: Precificação -->
+            <!-- 3. Precificação -->
             <div class="step" data-title="Precificação">
-                <div class="step-header">
-                    <h2>3. Precificação e Lucratividade</h2>
-                </div>
+                <div class="step-header"><h2>3. Precificação e Vendas</h2></div>
                 <div class="form-group">
-                    <label>Como os preços são definidos?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Ex: Multiplico custo por 2, copio o concorrente, uso markup técnico, etc.</span>
-                        </span>
-                    </label>
+                    <label>Como define os preços?</label>
                     <textarea name="prec_metodo"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Produtos mais vendidos (Top 3)
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quais são os itens "Carro-Chefe" da empresa?</span>
-                        </span>
-                    </label>
-                    <input type="text" name="prec_top_vendas">
-                </div>
-                <div class="form-group">
-                    <label>Produtos com menor margem/lucro
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Produtos que vendem mas deixam pouco dinheiro no caixa.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="prec_menor_lucro">
-                </div>
-                <div class="form-group">
-                    <label>Ticket Médio (Valor médio por venda)
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Faturamento total dividido pelo número de vendas no período.</span>
-                        </span>
-                    </label>
-                    <div class="input-symbol-wrapper">
-                        <input type="number" name="prec_ticket_medio" step="0.01">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Política de Descontos
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Regras para dar desconto. Ex: 10% à vista, 5% acima de R$500.</span>
-                        </span>
-                    </label>
-                    <textarea name="prec_descontos" placeholder="Como e quando são aplicados descontos?"></textarea>
+                    <label>Ticket Médio (Valor médio por venda)</label>
+                    <div class="input-symbol-wrapper"><input type="number" name="prec_ticket_medio" step="0.01"></div>
                 </div>
             </div>
 
-            <!-- Etapa 4: Atendimento -->
-            <div class="step" data-title="Atendimento">
-                <div class="step-header">
-                    <h2>4. Atendimento ao Cliente</h2>
-                </div>
+            <!-- 4. Marketing -->
+            <div class="step" data-title="Marketing">
+                <div class="step-header"><h2>4. Marketing e Canais</h2></div>
                 <div class="form-group">
-                    <label>Canais de atendimento utilizados
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Por onde o cliente fala com você? WhatsApp, Fone, Email, Chat.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="atend_canais" placeholder="WhatsApp, Email, Telefone, Instagram...">
-                </div>
-                <div class="form-group">
-                    <label>Tempo médio de resposta
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quanto tempo leva para o cliente ser respondido no primeiro contato?</span>
-                        </span>
-                    </label>
-                    <select name="atend_tempo">
-                        <option value="Imediato">Imediato</option>
-                        <option value="Ate 1h">Até 1 hora</option>
-                        <option value="Ate 24h">Até 24 horas</option>
-                        <option value="Mais de 24h">Mais de 24 horas</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Existe pós-venda estruturado?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Entrar em contato após a venda para verificar satisfação e oferecer novos produtos.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="atend_posvenda" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="atend_posvenda" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Principais reclamações dos clientes
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O que o cliente mais reclama? Preço, demora, qualidade?</span>
-                        </span>
-                    </label>
-                    <textarea name="atend_reclamacoes"></textarea>
-                </div>
-            </div>
-
-            <!-- Etapa 5: Vendas -->
-            <div class="step" data-title="Vendas">
-                <div class="step-header">
-                    <h2>5. Vendas e Processo Comercial</h2>
-                </div>
-                <div class="form-group">
-                    <label>Principais canais de aquisição de clientes
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Como os clientes chegam até você? (Indicação, Google, Instagram, Porta a porta).</span>
-                        </span>
-                    </label>
-                    <input type="text" name="vendas_canais_aquisicao">
-                </div>
-                <div class="form-group">
-                    <label>Funil de Vendas definido?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Etapas claras: Visitante -> Lead -> Oportunidade -> Negociação -> Venda.</span>
-                        </span>
-                    </label>
-                    <select name="vendas_funil">
-                        <option value="Nao">Não</option>
-                        <option value="Sim">Sim, etapas claras</option>
-                        <option value="Mais ou menos">Informalmente</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Possui metas de vendas definidas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Há um valor mensal alvo que todos conhecem? Ex: R$ 50k/mês.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="vendas_metas" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="vendas_metas" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Principais motivos de perda de vendas
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Por que o cliente desiste na hora H? Preço, Prazo, Atendimento...</span>
-                        </span>
-                    </label>
-                    <textarea name="vendas_perdas" placeholder="Ex: Preço, Prazo, Atendimento..."></textarea>
-                </div>
-            </div>
-
-            <!-- Etapa 6: Promoções -->
-            <div class="step" data-title="Promoções">
-                <div class="step-header">
-                    <h2>6. Promoções e Campanhas</h2>
-                </div>
-                <div class="form-group">
-                    <label>Realiza promoções com frequência?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Liquidações, Black Friday, Descontos sazonais.</span>
-                        </span>
-                    </label>
-                    <select name="promo_frequencia">
-                        <option value="Raramente">Raramente</option>
-                        <option value="Mensalmente">Mensalmente</option>
-                        <option value="Sazonalmente">Apenas datas sazonais</option>
-                        <option value="Sempre">Quase sempre</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Avalia o resultado (ROI) das campanhas?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Calcula quanto lucrou para cada real gasto na promoção?</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="promo_analise" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="promo_analise" value="Nao"> Não</label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Etapa 7: Marketing Digital -->
-            <div class="step" data-title="Mkt Digital">
-                <div class="step-header">
-                    <h2>7. Marketing Digital e Redes Sociais</h2>
-                </div>
-                <div class="form-group">
-                    <label>Redes Sociais ativas
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quais redes a empresa mantém atualizadas? Insta, Facebook, LinkedIn.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="mkt_redes" placeholder="Instagram, Facebook, LinkedIn, TikTok...">
-                </div>
-                <div class="form-group">
-                    <label>Frequência de postagens
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quantas vezes por semana você posta conteúdo?</span>
-                        </span>
-                    </label>
-                    <input type="text" name="mkt_frequencia">
-                </div>
-                <div class="form-group">
-                    <label>As redes sociais geram vendas diretas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O cliente vê o post e compra, ou a rede é apenas para "boniteza"?</span>
-                        </span>
-                    </label>
-                    <select name="mkt_converte">
-                        <option value="Nao">Não, só vitrine</option>
-                        <option value="Pouco">Pouco</option>
-                        <option value="Muito">Sim, é o principal canal</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Etapa 8: Tráfego Orgânico -->
-            <div class="step" data-title="Orgânico">
-                <div class="step-header">
-                    <h2>8. Tráfego Orgânico e SEO</h2>
-                </div>
-                <div class="form-group">
-                    <label>A empresa aparece no Google (Meu Negócio)?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Se alguém buscar seu nome ou serviço na cidade, seu mapa aparece?</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="seo_gmn" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="seo_gmn" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Produz conteúdo (Blog/Youtube)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Marketing de conteúdo para atrair clientes sem pagar anúncio.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="seo_conteudo" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="seo_conteudo" value="Nao"> Não</label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Etapa 9: Tráfego Pago -->
-            <div class="step" data-title="Tráfego Pago">
-                <div class="step-header">
-                    <h2>9. Tráfego Pago (Anúncios)</h2>
-                </div>
-                <div class="form-group">
-                    <label>Investe em anúncios pagos?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Google Ads, Facebook Ads, Instagram Ads (impulsionar).</span>
-                        </span>
-                    </label>
+                    <label>Investe em Tráfego Pago (Ads)?</label>
                     <select name="ads_investe" onchange="toggleAdsDetail(this.value)">
                         <option value="Nao">Não</option>
                         <option value="Sim">Sim</option>
@@ -1284,225 +450,33 @@
                 </div>
                 <div id="adsDetails" style="display:none;">
                     <div class="form-group">
-                        <label>Plataformas (Google/Meta)
-                            <span class="help-icon">?
-                                <span class="help-tooltip">Onde você coloca dinheiro? Instagram, Google Search, Youtube?</span>
-                            </span>
-                        </label>
-                        <input type="text" name="ads_plataformas">
+                        <label>Investimento Mensal em Ads</label>
+                        <div class="input-symbol-wrapper"><input type="number" name="ads_valor" step="0.01"></div>
                     </div>
-                    <div class="form-group">
-                        <label>Investimento Mensal Médio
-                            <span class="help-icon">?
-                                <span class="help-tooltip">Valor total gasto com as plataformas de anúncio.</span>
-                            </span>
-                        </label>
-                        <div class="input-symbol-wrapper">
-                            <input type="number" name="ads_valor" step="0.01">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Sabe o Custo por Lead/Venda?
-                             <span class="help-icon">?
-                                <span class="help-tooltip">Quanto custa cada cliente que entra em contato através do anúncio?</span>
-                            </span>
-                        </label>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="ads_cpl" value="Sim"> Sim</label>
-                            <label class="radio-option"><input type="radio" name="ads_cpl" value="Nao"> Não</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Etapa 10: Site -->
-            <div class="step" data-title="Site">
-                <div class="step-header">
-                    <h2>10. Site e Landing Pages</h2>
                 </div>
                 <div class="form-group">
-                    <label>Possui Site Institucional ou Loja?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Um domínio próprio (www.suaempresa.com.br).</span>
-                        </span>
-                    </label>
+                    <label>Redes Sociais Ativas</label>
+                    <input type="text" name="mkt_redes">
+                </div>
+                <div class="form-group">
+                    <label>Possui Site Próprio?</label>
                     <div class="radio-group">
                         <label class="radio-option"><input type="radio" name="site_possui" value="Sim"> Sim</label>
                         <label class="radio-option"><input type="radio" name="site_possui" value="Nao"> Não</label>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Utiliza ferramentas de análise (Google Analytics)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Ferramentas que mostram quantos visitantes o site teve e de onde vieram.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="site_analytics" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="site_analytics" value="Nao"> Não</label>
-                    </div>
-                </div>
             </div>
 
-            <!-- Etapa 11: Tecnologia -->
-            <div class="step" data-title="Tecnologia">
-                <div class="step-header">
-                    <h2>11. ERP, Sistemas e Tecnologia</h2>
-                </div>
-                <div class="form-group">
-                    <label>Utiliza sistema de gestão (ERP)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Sistema integrado que controla estoque, vendas e financeiro. Ex: Bling, Tiny, Totvs.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="tec_erp" placeholder="Nome do sistema ou 'Não'">
-                </div>
-                <div class="form-group">
-                    <label>Utiliza CRM para gestão de clientes?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Sistema para registrar interações, histórico e follow-up com clientes.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="tec_crm" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="tec_crm" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Há muito retrabalho manual ou planilhas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Você precisa digitar a mesma coisa em dois lugares diferentes?</span>
-                        </span>
-                    </label>
-                    <select name="tec_manual">
-                        <option value="Nao">Não, tudo integrado</option>
-                        <option value="Pouco">Alguns processos</option>
-                        <option value="Muito">Sim, muito manual</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Etapa 12: Marketplaces -->
-            <div class="step" data-title="Marketplaces">
-                <div class="step-header">
-                    <h2>12. Marketplaces e Canais Externos</h2>
-                </div>
-                <div class="form-group">
-                    <label>Vende em Marketplaces (ML, Shopee, Amazon)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Plataformas de terceiros onde você expõe seus produtos.</span>
-                        </span>
-                    </label>
-                    <select name="mktp_vende" onchange="toggleMktpDetail(this.value)">
-                        <option value="Nao">Não</option>
-                        <option value="Sim">Sim</option>
-                    </select>
-                </div>
-                <div id="mktpDetails" style="display:none;">
-                    <div class="form-group">
-                        <label>Quais plataformas?
-                            <span class="help-icon">?
-                                <span class="help-tooltip">Liste as principais. Ex: Mercado Livre, Magalu, Shopee.</span>
-                            </span>
-                        </label>
-                        <input type="text" name="mktp_quais">
-                    </div>
-                    <div class="form-group">
-                        <label>Controle de estoque é integrado?
-                             <span class="help-icon">?
-                                <span class="help-tooltip">Quando vende no Mercado Livre, baixa automaticamente do seu sistema?</span>
-                            </span>
-                        </label>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="mktp_estoque" value="Sim"> Sim</label>
-                            <label class="radio-option"><input type="radio" name="mktp_estoque" value="Nao"> Não</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Etapa 13: Pessoas -->
-            <div class="step" data-title="Pessoas">
-                <div class="step-header">
-                    <h2>13. Pessoas e Processos</h2>
-                </div>
-                <div class="form-group">
-                    <label>As funções dos funcionários são bem definidas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Cada um sabe exatamente o que deve fazer, ou todos fazem tudo?</span>
-                        </span>
-                    </label>
-                    <select name="pp_funcoes">
-                        <option value="Sim">Sim, claras</option>
-                        <option value="Parcial">Parcialmente</option>
-                        <option value="Nao">Não, todos fazem tudo</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Existem processos documentados (POP)?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Procedimento Operacional Padrão: Manuais de como fazer as tarefas da empresa.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="pp_processos" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="pp_processos" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Principais gargalos operacionais hoje
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Onde a operação trava? Entrega, Produção, Financeiro?</span>
-                        </span>
-                    </label>
-                    <textarea name="pp_gargalos"></textarea>
-                </div>
-            </div>
-
-            <!-- Etapa 14: Objetivos -->
+            <!-- 5. Objetivos -->
             <div class="step" data-title="Objetivos">
-                <div class="step-header">
-                    <h2>14. Objetivos da Consultoria</h2>
+                <div class="step-header"><h2>5. Objetivos e Problemas</h2></div>
+                <div class="form-group">
+                    <label>Quais os maiores problemas atuais? *</label>
+                    <textarea name="obj_problemas" required placeholder="O que mais atrapalha o crescimento?"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Quais os maiores problemas atuais?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O que tira seu sono hoje? Falta de dinheiro, falta de vendas, equipe desmotivada?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_problemas" required></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Onde a empresa mais perde dinheiro/oportunidade?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Onde você acha que o dinheiro está escorrendo pelo ralo?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_perda_dinheiro"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Objetivo Principal (Curto Prazo)
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O que precisa ser resolvido nos próximos 30 dias?</span>
-                        </span>
-                    </label>
-                    <input type="text" name="obj_principal">
-                </div>
-                <div class="form-group">
-                    <label>Meta para 6 e 12 meses
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Onde você quer estar daqui a um ano?</span>
-                        </span>
-                    </label>
+                    <label>Meta para os próximos 6 meses</label>
                     <textarea name="obj_metas"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Observações Finais
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Algo mais que o consultor precise saber?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_obs"></textarea>
                 </div>
             </div>
 
@@ -1519,87 +493,75 @@
             <div class="report-header">
                 <h1>Relatório de Diagnóstico Inicial</h1>
                 <p>Gerado em: <span id="reportDate"></span></p>
-                <p>Usuário Responsável: <span id="reportUser"></span></p>
-                <small style="color:#777">Dados recuperados do Firebase</small>
+                <p>Responsável: <span id="reportUser"></span></p>
             </div>
             
-            <div id="reportContent">
-                <!-- Conteúdo gerado via JS -->
-            </div>
+            <div id="reportContent"><!-- Preenchido via JS --></div>
 
             <div id="adviceSection">
-                <h2>Próximos Passos</h2>
+                <h2>Análise com Inteligência Artificial</h2>
                 <div id="adviceContent">
-                    <p>Gere um backup e envie para análise.</p>
+                    <p style="text-align:center; color:#666;">Clique no botão abaixo para gerar o plano de ação.</p>
                 </div>
             </div>
 
             <div class="action-bar">
-                <button class="btn-ai" onclick="generateAdvice()">💡 Gerar Plano de Ação (IA)</button>
+                <button class="btn-ai" onclick="generateAdvice()">🤖 Gerar Consultoria IA (DeepSeek)</button>
                 <button class="btn-backup" onclick="backupData()">💾 Backup</button>
-                <button class="btn-restore" onclick="restoreData()">📂 Restore</button>
+                <button class="btn-restore" onclick="restoreData()">📂 Restaurar</button>
                 <input type="file" id="restoreInput" style="display:none" onchange="handleFileSelect(event)">
-                <button class="btn-prev" onclick="editForm()">Editar Respostas</button>
-                <button class="btn-print" onclick="window.print()">Salvar PDF / Imprimir</button>
-                <button class="btn-reset" onclick="clearData()">Limpar Dados</button>
+                <button class="btn-prev" onclick="editForm()">Editar Dados</button>
+                <button class="btn-print" onclick="window.print()">Imprimir PDF</button>
             </div>
         </div>
     </div>
 
     <footer>
-        <a href="https://www.websitelog.com.br" target="_blank">www.websitelog.com.br</a>
+        <a href="#" target="_blank">Sistema de Consultoria 2.0</a>
     </footer>
 
     <script>
-        // --- 1. CONFIGURAÇÃO DO FIREBASE (SUBSTITUA AQUI) ---
-        // Você pega isso no Console do Firebase > Configurações do Projeto > Geral > Seus aplicativos
-const firebaseConfig = {
-  apiKey: "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM",
-  authDomain: "diagnostico-a2247.firebaseapp.com",
-  projectId: "diagnostico-a2247",
-  storageBucket: "diagnostico-a2247.firebasestorage.app",
-  messagingSenderId: "125978207628",
-  appId: "1:125978207628:web:f5135603051550de1fe2a9",
-  measurementId: "G-6R39CB3R52"
-}
+        // --- 1. CONFIGURAÇÃO DO FIREBASE ---
+        // COLOQUE SUAS CREDENCIAIS AQUI
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY_DO_FIREBASE",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO_ID",
+            storageBucket: "SEU_PROJETO.firebasestorage.app",
+            messagingSenderId: "SEU_MESSAGING_ID",
+            appId: "SEU_APP_ID"
+        };
 
         // Inicializa Firebase
         let auth, db;
         try {
-            if (firebaseConfig.apiKey !== "COLE_SUA_API_KEY_AQUI") {
+            if (firebaseConfig.apiKey !== "SUA_API_KEY_DO_FIREBASE") {
                 firebase.initializeApp(firebaseConfig);
                 auth = firebase.auth();
                 db = firebase.firestore();
-                console.log("Firebase inicializado com sucesso");
+                console.log("Firebase OK");
             } else {
-                console.warn("Firebase Config não preenchido. As funcionalidades de nuvem não funcionarão.");
+                console.warn("⚠️ Firebase não configurado no código.");
             }
-        } catch (e) {
-            console.error("Erro ao inicializar Firebase:", e);
-        }
+        } catch (e) { console.error("Erro Firebase:", e); }
 
-        // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
-        const CONST_ADD = 13;
-        const CONST_MULT = 9;
-        const CONST_BASE = 1954;
-        let generatedRandomNumber = 0; 
-        
-        // --- ESTADO DA APLICAÇÃO ---
-        let currentUser = null; 
+        // Variáveis Globais
+        let currentUser = null;
+        let currentStep = 0;
+        const CONST_ADD = 13; const CONST_MULT = 9; const CONST_BASE = 1954;
+        let generatedRandomNumber = 0;
 
-        // --- Elementos DOM ---
+        // Elementos UI
         const authScreen = document.getElementById('authScreen');
         const appContainer = document.querySelector('.container');
-        const userDisplay = document.getElementById('userWelcomeDisplay');
-        const reportUserSpan = document.getElementById('reportUser');
         const lockScreen = document.getElementById('lockScreen');
         const loadingOverlay = document.getElementById('loadingOverlay');
-
+        const steps = document.querySelectorAll(".step");
+        
         function showLoading() { loadingOverlay.style.display = 'flex'; }
         function hideLoading() { loadingOverlay.style.display = 'none'; }
 
-        // --- AUTH & FIRESTORE LOGIC ---
-
+        // --- AUTH LOGIC ---
         function switchAuthView(viewId) {
             document.querySelectorAll('.auth-view').forEach(v => v.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
@@ -1610,742 +572,352 @@ const firebaseConfig = {
             const name = document.getElementById('regName').value;
             const email = document.getElementById('regEmail').value;
             const pass = document.getElementById('regPass').value;
-
-            if(!name || !email || !pass) return alert("Preencha todos os campos.");
-            if(!auth) return alert("Erro: Firebase não configurado no código.");
+            if(!auth) return alert("Configure o Firebase no código.");
 
             showLoading();
             try {
-                // 1. Cria usuário no Authentication
                 const userCred = await auth.createUserWithEmailAndPassword(email, pass);
-                const uid = userCred.user.uid;
-
-                // 2. Prepara dados da licença (30 dias grátis ou Admin)
                 const now = new Date();
-                let expirationTime;
-
-                // Regra 6: Admin tem 9999 dias
-                if (email === 'jcnvap@gmail.com') {
-                    expirationTime = now.getTime() + (9999 * 24 * 60 * 60 * 1000);
-                } else {
-                    // Regra 2: 30 dias grátis
-                    expirationTime = now.getTime() + (30 * 24 * 60 * 60 * 1000);
-                }
-
-                const userData = {
-                    name: name,
-                    email: email,
-                    role: (email === 'jcnvap@gmail.com') ? 'admin' : 'user',
-                    license: {
-                        expiration: expirationTime,
-                        lastAccess: now.getTime()
-                    },
-                    diagnosisData: {} // Dados do formulário vazio
-                };
-
-                // 3. Salva no Firestore
-                await db.collection("users").doc(uid).set(userData);
+                const expTime = now.getTime() + (30 * 24 * 60 * 60 * 1000); // 30 dias grátis
                 
-                alert("Conta criada com sucesso no Firebase!");
-                // Login automático após cadastro
-                await loginSuccess(uid, userData);
-
-            } catch (error) {
-                console.error(error);
-                let msg = "Erro ao cadastrar: " + error.message;
-                if(error.code === 'auth/email-already-in-use') msg = "E-mail já está em uso.";
-                if(error.code === 'auth/weak-password') msg = "A senha deve ter pelo menos 6 caracteres.";
-                alert(msg);
-            } finally {
-                hideLoading();
-            }
+                const userData = {
+                    name: name, email: email, role: 'user',
+                    license: { expiration: expTime, lastAccess: now.getTime() },
+                    diagnosisData: {}
+                };
+                await db.collection("users").doc(userCred.user.uid).set(userData);
+                await loginSuccess(userCred.user.uid, userData);
+            } catch (err) { alert(err.message); } 
+            finally { hideLoading(); }
         }
 
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
-
-            if(!auth) return alert("Erro: Firebase não configurado.");
+            if(!auth) return alert("Configure o Firebase no código.");
 
             showLoading();
             try {
                 const userCred = await auth.signInWithEmailAndPassword(email, pass);
-                const uid = userCred.user.uid;
-                
-                // Busca dados no Firestore
-                const doc = await db.collection("users").doc(uid).get();
-                if (doc.exists) {
-                    await loginSuccess(uid, doc.data());
-                } else {
-                    // Usuário existe no Auth mas não no Firestore (fallback de integridade)
-                    alert("Dados do perfil não encontrados. Entre em contato com suporte.");
-                    auth.signOut();
-                }
-            } catch (error) {
-                console.error(error);
-                alert("Erro ao entrar: " + error.message);
-            } finally {
-                hideLoading();
-            }
+                const doc = await db.collection("users").doc(userCred.user.uid).get();
+                if(doc.exists) await loginSuccess(userCred.user.uid, doc.data());
+                else { alert("Dados não encontrados."); auth.signOut(); }
+            } catch (err) { alert("Erro no login: " + err.message); }
+            finally { hideLoading(); }
         }
 
-        async function handleForgot(e) {
+        function handleForgot(e) {
             e.preventDefault();
             const email = document.getElementById('forgotEmail').value;
-            if(!auth) return;
-            
-            showLoading();
-            try {
-                await auth.sendPasswordResetEmail(email);
-                alert("Link de redefinição enviado para " + email);
-                switchAuthView('loginView');
-            } catch (error) {
-                alert("Erro: " + error.message);
-            } finally {
-                hideLoading();
-            }
+            if(auth) auth.sendPasswordResetEmail(email).then(() => alert("Email enviado!"));
         }
 
-        // Função central de validação de acesso
         async function loginSuccess(uid, userData) {
-            const nowTime = Date.now();
-            
-            // Regra 6: Reforço de Admin caso o banco esteja desatualizado
-            if (userData.email === 'jcnvap@gmail.com') {
-                const minAdminExp = nowTime + (1000 * 60 * 60 * 24 * 365);
-                if (userData.license.expiration < minAdminExp) {
-                     userData.license.expiration = nowTime + (9999 * 24 * 60 * 60 * 1000); 
-                }
-            }
-
-            // Regra 5: Validação de data retroativa
-            // Tolerância de 2 minutos para diferenças de relógio
-            if (userData.license.lastAccess > nowTime + 120000) { 
-                alert("Erro de segurança: A data do seu dispositivo parece estar errada (atrasada em relação ao último acesso registrado). Por favor, ajuste o relógio.");
-                hideLoading();
-                // Não permite prosseguir
-                return;
-            }
-
-            // Atualiza lastAccess no banco (Persistência da Regra 5)
-            // Fazemos isso sem esperar (fire and forget) para não travar a UI, ou esperamos se for crítico.
-            // Aqui vamos esperar para garantir consistência.
-            userData.license.lastAccess = nowTime;
-            
-            await db.collection("users").doc(uid).update({ 
-                "license.lastAccess": nowTime,
-                // Atualiza expiração caso tenha sido corrigida pelo admin check
-                "license.expiration": userData.license.expiration 
-            });
-
-            // Atualiza objeto local
-            currentUser = { uid: uid, ...userData };
-
-            // Verifica Expiração (Regra 4)
-            if (nowTime > userData.license.expiration) {
+            const now = Date.now();
+            // Validação simples de expiração
+            if(now > userData.license.expiration) {
+                currentUser = { uid: uid, ...userData };
                 authScreen.style.display = 'none';
-                lockScreen.style.display = 'flex'; // Exibe tela de bloqueio
+                lockScreen.style.display = 'flex';
                 hideLoading();
                 return;
             }
-
-            // Sucesso: Libera App
+            // Atualiza acesso
+            await db.collection("users").doc(uid).update({ "license.lastAccess": now });
+            currentUser = { uid: uid, ...userData };
             proceedToApp();
         }
 
         function proceedToApp() {
-            authScreen.style.display = 'none';
-            lockScreen.style.display = 'none';
-            appContainer.style.display = 'block'; 
+            authScreen.style.display = 'none'; lockScreen.style.display = 'none';
+            appContainer.style.display = 'block'; document.querySelector('header').style.display = 'block';
             document.querySelector('.nav-buttons').style.display = 'flex';
-            document.querySelector('header').style.display = 'block';
-            document.querySelector('.progress-container').style.display = 'block';
             
-            userDisplay.textContent = `Olá, ${currentUser.name}`;
-            reportUserSpan.textContent = currentUser.name;
-
+            document.getElementById('userWelcomeDisplay').textContent = `Olá, ${currentUser.name}`;
+            document.getElementById('reportUser').textContent = currentUser.name;
             updateDaysBadge();
-            
-            // Carregar dados salvos no Firestore para o formulário
-            if (currentUser.diagnosisData) {
-                loadFormDataFromObject(currentUser.diagnosisData);
-            }
 
-            // Regra 7: Botão IA visível para todos
-            const btnAi = document.querySelector('.btn-ai');
-            btnAi.style.display = 'inline-flex';
+            // Carrega dados salvos
+            if(currentUser.diagnosisData) loadFormData(currentUser.diagnosisData);
+            
+            // Exibe botão AI
+            document.querySelector('.btn-ai').style.display = 'inline-flex';
         }
 
         function handleLogout() {
-            if(auth) {
-                auth.signOut().then(() => {
-                    currentUser = null;
-                    location.reload();
-                });
-            } else {
-                location.reload();
-            }
+            if(auth) auth.signOut().then(() => location.reload());
+            else location.reload();
         }
 
-        // Verifica sessão ativa ao recarregar página (Persistência de Sessão)
-        window.onload = function() {
-            if(auth) {
-                auth.onAuthStateChanged(async (user) => {
-                    if (user) {
-                        // Usuário já logado no Firebase Auth
-                        if(!currentUser) {
-                            showLoading();
-                            try {
-                                const doc = await db.collection("users").doc(user.uid).get();
-                                if(doc.exists) {
-                                    await loginSuccess(user.uid, doc.data());
-                                } else {
-                                    // Sessão existe mas sem dados? Logout.
-                                    auth.signOut();
-                                    hideLoading();
-                                }
-                            } catch(e) {
-                                console.error(e);
-                                hideLoading();
-                            }
-                        }
-                    } else {
-                        // Ninguém logado, mostra tela de auth
-                        authScreen.style.display = 'flex';
-                        hideLoading(); // Remove overlay inicial se houver
-                    }
-                });
-            } else {
-                 // Fallback se firebase não carregar
-                 authScreen.style.display = 'flex';
-            }
-        };
-
-        // --- SALVAMENTO DE DADOS (AUTO-SAVE NO FIRESTORE) ---
+        // --- SALVAMENTO AUTOMÁTICO ---
         let timeoutId;
         const form = document.getElementById("diagnosisForm");
-        
         form.querySelectorAll("input, select, textarea").forEach(field => {
             field.addEventListener("input", () => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(saveToFirebase, 2000); // Debounce 2s
+                clearTimeout(timeoutId); timeoutId = setTimeout(saveToFirebase, 2000);
             });
             field.addEventListener("change", saveToFirebase);
         });
 
         async function saveToFirebase() {
             if(!currentUser || !currentUser.uid) return;
-            
             const formData = new FormData(form);
             const data = {};
-            formData.forEach((value, key) => {
-                data[key] = value;
-            });
-
-            // Atualiza objeto local
-            currentUser.diagnosisData = data;
-
-            // UI de salvamento
-            const cloudStatus = document.querySelector('.cloud-status');
-            if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Salvando...`;
+            formData.forEach((value, key) => data[key] = value);
+            
+            currentUser.diagnosisData = data; // Atualiza local
+            const cloud = document.querySelector('.cloud-status');
+            if(cloud) cloud.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Salvando...`;
             
             try {
-                await db.collection("users").doc(currentUser.uid).update({
-                    diagnosisData: data
-                });
-                if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot"></span> Firebase Conectado`;
-            } catch (e) {
-                console.error("Erro ao salvar", e);
-                if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:red"></span> Erro ao salvar`;
-            }
+                await db.collection("users").doc(currentUser.uid).update({ diagnosisData: data });
+                if(cloud) cloud.innerHTML = `<span class="cloud-dot"></span> Firebase Conectado`;
+            } catch(e) { console.error(e); }
         }
 
-        function loadFormDataFromObject(data) {
+        function loadFormData(data) {
             Object.keys(data).forEach(key => {
-                const fields = document.getElementsByName(key);
-                if (fields.length > 0) {
-                    const field = fields[0];
-                    if (field.type === "radio") {
-                        for(let i=0; i<fields.length; i++) {
-                            if(fields[i].value === data[key]) fields[i].checked = true;
-                        }
-                    } else if (field.type === "checkbox") {
-                        field.checked = true;
-                    } else {
-                        field.value = data[key];
-                    }
+                const els = document.getElementsByName(key);
+                if(els.length) {
+                    if(els[0].type === 'radio') {
+                        els.forEach(el => { if(el.value === data[key]) el.checked = true; });
+                    } else { els[0].value = data[key]; }
                     if(key === 'ads_investe') toggleAdsDetail(data[key]);
-                    if(key === 'mktp_vende') toggleMktpDetail(data[key]);
                 }
             });
-            // Atualiza navegação visualmente
-            showStep(currentStep); 
         }
 
-        // --- SISTEMA DE BLOQUEIO E CONTRA-SENHA (REGRA 3 e 4) ---
+        // --- SISTEMA DE LICENÇA ---
         function generateRandomCode() {
-            // Regra 3: Número entre 100 e 1000
             generatedRandomNumber = Math.floor(Math.random() * 901) + 100;
-            const display = document.getElementById('displayRandomCode');
-            display.textContent = generatedRandomNumber;
-            display.style.display = 'block';
+            const disp = document.getElementById('displayRandomCode');
+            disp.textContent = generatedRandomNumber; disp.style.display = 'block';
         }
 
         async function validateUnlock() {
-            const input = document.getElementById('unlockInput').value.trim();
-            // Regra 4: Formato XXXXX-YYY
-            const parts = input.split('-');
+            const input = document.getElementById('unlockInput').value.trim().split('-');
+            if(input.length !== 2) return alert("Formato inválido. Use XXXXX-YYY");
             
-            if (parts.length !== 2) return alert("Formato inválido. Use XXXXX-YYY.");
+            const code = parseInt(input[0]);
+            const days = parseInt(input[1]);
+            const expected = (generatedRandomNumber + CONST_ADD) * CONST_MULT + CONST_BASE;
 
-            const codeInput = parseInt(parts[0]);
-            const daysInput = parseInt(parts[1]);
-            
-            // Regra 3: Fórmula (R + 13) * 9 + 1954
-            const expectedCode = (generatedRandomNumber + CONST_ADD) * CONST_MULT + CONST_BASE;
-
-            if (codeInput === expectedCode) {
-                const now = new Date();
-                // Adiciona dias à data atual
-                const newExpiration = now.getTime() + (daysInput * 24 * 60 * 60 * 1000);
-                
-                showLoading();
-                try {
-                    // Atualiza Firestore
-                    await db.collection("users").doc(currentUser.uid).update({
-                        "license.expiration": newExpiration,
-                        "license.lastAccess": now.getTime()
-                    });
-                    
-                    // Atualiza local
-                    currentUser.license.expiration = newExpiration;
-                    currentUser.license.lastAccess = now.getTime();
-                    
-                    hideLoading();
-                    alert(`Licença renovada no Firebase por ${daysInput} dias!`);
-                    
-                    document.getElementById('unlockInput').value = "";
-                    document.getElementById('displayRandomCode').style.display = 'none';
-                    
-                    proceedToApp();
-                } catch(e) {
-                    console.error(e);
-                    hideLoading();
-                    alert("Erro ao atualizar licença no banco de dados.");
-                }
-            } else {
-                alert("Contra-senha inválida.");
-            }
+            if(code === expected) {
+                const newExp = Date.now() + (days * 24 * 60 * 60 * 1000);
+                await db.collection("users").doc(currentUser.uid).update({ "license.expiration": newExp });
+                currentUser.license.expiration = newExp;
+                alert(`Renovado por ${days} dias!`);
+                proceedToApp();
+            } else { alert("Código inválido."); }
         }
 
-        function openLockScreenForRenewal() {
-            closeSettings();
-            appContainer.style.display = 'none';
-            document.querySelector('.nav-buttons').style.display = 'none';
-            document.querySelector('header').style.display = 'none';
-            lockScreen.style.display = 'flex';
-        }
-
-        // --- UI HELPERS ---
-        let currentStep = 0;
-        const steps = document.querySelectorAll(".step");
-
+        // --- UI STEPS ---
         function showStep(n) {
-            steps.forEach((step, index) => {
-                step.classList.remove("active");
-                step.style.display = "none"; // Garante ocultação
-                if (index === n) {
-                    step.classList.add("active");
-                    step.style.display = "block";
-                }
-            });
-            
+            steps.forEach((s, i) => { s.classList.remove("active"); s.style.display = "none"; if(i === n) { s.classList.add("active"); s.style.display = "block"; }});
             document.getElementById("prevBtn").style.visibility = n === 0 ? "hidden" : "visible";
-            
-            if (n === steps.length - 1) {
+            if(n === steps.length - 1) {
                 document.getElementById("nextBtn").style.display = "none";
                 document.getElementById("submitBtn").style.display = "inline-block";
             } else {
                 document.getElementById("nextBtn").style.display = "inline-block";
-                document.getElementById("nextBtn").innerHTML = "Próximo";
                 document.getElementById("submitBtn").style.display = "none";
+                document.getElementById("nextBtn").innerText = "Próximo";
             }
-            const progressBar = document.getElementById("progressBar");
-            if(progressBar) progressBar.style.width = ((n + 1) / steps.length) * 100 + "%";
-            window.scrollTo(0, 0);
+            document.getElementById("progressBar").style.width = ((n + 1) / steps.length) * 100 + "%";
+            window.scrollTo(0,0);
         }
 
         function nextPrev(n) {
-            if (n === 1 && !validateForm()) return false;
-            
-            // Oculta step atual
+            if(n === 1 && !validateForm()) return false;
             steps[currentStep].style.display = "none";
             currentStep += n;
-            
-            if (currentStep >= steps.length) {
-                generateReport();
-                return false;
-            }
+            if(currentStep >= steps.length) { generateReport(); return false; }
             showStep(currentStep);
         }
 
         function validateForm() {
             let valid = true;
-            const currentInputs = steps[currentStep].querySelectorAll("input[required], select[required], textarea[required]");
-            currentInputs.forEach(input => {
-                if (input.value.trim() === "") {
-                    input.style.borderColor = "#ff6b6b";
-                    valid = false;
-                } else {
-                    input.style.borderColor = "#ccc";
-                }
+            steps[currentStep].querySelectorAll("[required]").forEach(i => {
+                if(!i.value.trim()){ i.style.borderColor = "red"; valid = false; }
+                else i.style.borderColor = "#ccc";
             });
-            if (!valid) alert("Preencha os campos obrigatórios marcados.");
+            if(!valid) alert("Preencha os campos obrigatórios.");
             return valid;
         }
 
+        function toggleAdsDetail(val) { document.getElementById('adsDetails').style.display = val === 'Sim' ? 'block' : 'none'; }
+        
         function updateDaysBadge() {
-            if (!currentUser) return;
-            const now = Date.now();
-            const diff = currentUser.license.expiration - now;
-            const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-            document.getElementById('daysBadge').textContent = daysLeft > 0 ? `${daysLeft}d` : '0d';
+            const diff = currentUser.license.expiration - Date.now();
+            const d = Math.ceil(diff / (86400000));
+            document.getElementById('daysBadge').textContent = d > 0 ? `${d}d` : '0d';
         }
-        
+
         function openSettings() {
-            const modal = document.getElementById('settingsModal');
-            const now = Date.now();
-            const exp = currentUser.license.expiration;
-            const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
-            
+            document.getElementById('settingsModal').style.display = 'flex';
             document.getElementById('settingsUser').textContent = currentUser.name;
-            document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo (Firebase)" : "Expirado";
-            document.getElementById('settingsDate').textContent = new Date(exp).toLocaleDateString();
-            document.getElementById('settingsDaysLeft').textContent = daysLeft;
-            modal.style.display = 'flex';
+            document.getElementById('settingsDate').textContent = new Date(currentUser.license.expiration).toLocaleDateString();
+            document.getElementById('settingsDaysLeft').textContent = document.getElementById('daysBadge').textContent;
+            document.getElementById('settingsStatus').textContent = "Ativo";
         }
-
         function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
-        
-        function toggleAdsDetail(val) { document.getElementById('adsDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
-        function toggleMktpDetail(val) { document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
+        function openLockScreenForRenewal() { closeSettings(); appContainer.style.display='none'; lockScreen.style.display='flex'; }
 
-        // --- IA / RELATÓRIO / BACKUP ---
+        // --- RELATÓRIO E EDIÇÃO ---
         function generateReport() {
             document.getElementById("diagnosisForm").style.display = "none";
             document.querySelector('.nav-buttons').style.display = 'none';
             document.getElementById("reportSection").style.display = "block";
             
             const now = new Date();
-            document.getElementById("reportDate").innerText = now.toLocaleDateString() + " às " + now.toLocaleTimeString();
-            
-            // Renderiza relatório simples
-            let html = "";
-            steps.forEach((step) => {
-                const title = step.querySelector('.step-header h2').innerText;
-                html += `<div class="report-block"><h3>${title}</h3>`;
-                // Logica de extração de inputs igual ao original
-                const inputs = step.querySelectorAll("input, select, textarea");
-                let processedNames = [];
-                inputs.forEach(input => {
-                    if (input.type === "submit" || input.type === "button") return;
-                    if (input.closest('#adsDetails') && input.closest('#adsDetails').style.display === 'none') return;
-                    if (input.closest('#mktpDetails') && input.closest('#mktpDetails').style.display === 'none') return;
+            document.getElementById("reportDate").textContent = now.toLocaleDateString() + " " + now.toLocaleTimeString();
 
-                    if(processedNames.includes(input.name)) return;
+            let html = "";
+            steps.forEach(step => {
+                const title = step.getAttribute('data-title');
+                html += `<div class="report-block"><h3>${title}</h3>`;
+                step.querySelectorAll("input, select, textarea").forEach(input => {
+                    if(input.type === 'button' || !input.value) return;
+                    if(input.closest('#adsDetails') && input.closest('#adsDetails').style.display==='none') return;
                     
                     let val = input.value;
-                    let labelText = input.name; // Fallback
-
-                    // Tenta pegar label
-                    if (input.closest('.form-group')) {
-                        const label = input.closest('.form-group').querySelector('label');
-                        if(label) labelText = label.innerText.split('?')[0].replace('*','').trim();
+                    let label = input.closest('.form-group')?.querySelector('label')?.innerText.replace('*','') || input.name;
+                    
+                    if(input.type === 'radio') {
+                        if(!input.checked) return; // Só mostra o selecionado
+                    } else if(input.tagName === 'SELECT') {
+                        val = input.options[input.selectedIndex].text;
                     }
-
-                    if(input.type === "radio") {
-                        const checked = step.querySelector(`input[name="${input.name}"]:checked`);
-                        val = checked ? checked.value : "Não informado";
-                    } else if (input.tagName === "SELECT") {
-                         val = input.options[input.selectedIndex].text;
-                    }
-
-                    if(val) {
-                         html += `<div class="report-item"><strong>${labelText}</strong><span>${val}</span></div>`;
-                         processedNames.push(input.name);
-                    }
+                    html += `<div class="report-item"><strong>${label}</strong><span>${val}</span></div>`;
                 });
                 html += `</div>`;
             });
             document.getElementById("reportContent").innerHTML = html;
         }
-        
-        // --- NOVA FUNÇÃO DE EDIÇÃO (VOLTA P/ PAGINA 1) ---
+
         function editForm() {
             document.getElementById("reportSection").style.display = "none";
             document.getElementById("diagnosisForm").style.display = "block";
             document.querySelector('.nav-buttons').style.display = 'flex';
-            
-            // Reseta a visualização para a primeira etapa
-            currentStep = 0;
-            showStep(currentStep);
-            
-            // Se necessário, rola para o topo
-            window.scrollTo(0, 0);
+            currentStep = 0; showStep(0);
         }
 
-// aqui Inicio
-        // --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
-// --- SUBSTITUA A FUNÇÃO generateAdvice EXISTENTE POR ESTA ---
+        // --- DEEPSEEK AI INTEGRATION ---
+        async function generateAdvice() {
+            // ******************************************************
+            // COLOQUE SUA CHAVE DA DEEPSEEK (OU OPENAI) ABAIXO
+            const DEEPSEEK_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; 
+            // ******************************************************
+            
+            const API_URL = "https://api.deepseek.com/chat/completions";
 
-async function generateAdvice() {
-    // 1. Configuração
-    const DEEPSEEK_API_KEY = "SUA_CHAVE_API_AQUI"; // <--- COLOQUE SUA CHAVE AQUI
-    const API_URL = "https://api.deepseek.com/chat/completions";
-    
-    // Verifica se tem dados
-    if (!currentUser || !currentUser.diagnosisData) {
-        alert("Nenhum dado encontrado para gerar o plano.");
-        return;
-    }
+            if(!currentUser || !currentUser.diagnosisData) return alert("Preencha o formulário primeiro.");
+            if(DEEPSEEK_API_KEY.includes("xxxx")) return alert("Erro: Chave de API não configurada no código.");
 
-    showLoading(); // Mostra o spinner
+            showLoading();
 
-    // 2. Preparar os dados para a IA (Contexto)
-    const data = currentUser.diagnosisData;
-    const nomeEmpresa = data.empresa_nome || "Empresa";
-    
-    // Transformamos o objeto JSON em uma string legível para a IA
-    const dadosFormatados = JSON.stringify(data, null, 2);
+            const data = currentUser.diagnosisData;
+            const systemPrompt = `Você é um Consultor Empresarial Sênior. Analise o JSON abaixo e crie um plano de ação estratégico.
+            Seja direto, profissional e use Markdown (negrito, listas). 
+            Estrutura da resposta: 
+            1. Diagnóstico Resumido (3 pontos críticos)
+            2. Estratégia Financeira (Corte de custos e precificação)
+            3. Estratégia de Vendas e Marketing (Ações práticas)
+            4. Conclusão Motivacional.`;
 
-    // 3. Montar o Prompt (Instrução do Sistema e do Usuário)
-    const promptSystem = `
-        Você é um Consultor Empresarial Sênior especialista em reestruturação financeira e estratégia.
-        Analise os dados JSON fornecidos de uma empresa.
-        
-        Sua tarefa:
-        1. Identificar os 3 maiores problemas baseados nos dados (financeiro, vendas, processos).
-        2. Criar um Plano de Ação Prático com 3 a 5 passos imediatos.
-        3. Ser direto, profissional e usar formatação Markdown (negrito, listas).
-        4. O tom deve ser encorajador mas realista.
-        5. Não use introduções genéricas, vá direto ao ponto.
-    `;
+            const userPrompt = `Dados da empresa: ${JSON.stringify(data)}`;
 
-    const promptUser = `Aqui estão os dados da empresa ${nomeEmpresa}: \n\n ${dadosFormatados}`;
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: "deepseek-chat",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userPrompt }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 2000
+                    })
+                });
 
-    try {
-        // 4. Chamada à API (Fetch)
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: "deepseek-chat", // Modelo da DeepSeek
-                messages: [
-                    { role: "system", content: promptSystem },
-                    { role: "user", content: promptUser }
-                ],
-                temperature: 0.7, // Criatividade equilibrada
-                max_tokens: 1500  // Limite da resposta
-            })
-        });
+                if (!response.ok) throw new Error("Erro na API da IA: " + response.statusText);
 
-        if (!response.ok) {
-            const errorDetails = await response.json();
-            throw new Error(`Erro na API: ${errorDetails.error?.message || response.statusText}`);
+                const json = await response.json();
+                const aiText = json.choices[0].message.content;
+
+                // Renderiza Markdown para HTML usando a lib 'marked'
+                const htmlContent = marked.parse(aiText);
+
+                document.getElementById("adviceContent").innerHTML = `
+                    <div class="advice-card">${htmlContent}</div>
+                    <small style="display:block; text-align:center; color:#888; margin-top:10px">Gerado por Inteligência Artificial</small>
+                `;
+                
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao gerar consultoria: " + error.message);
+            } finally {
+                hideLoading();
+            }
         }
 
-        const jsonResponse = await response.json();
-        
-        // 5. Pegar o texto da resposta
-        const aiText = jsonResponse.choices[0].message.content;
-
-        // 6. Atualizar a Interface (Renderizar Markdown para HTML)
-        const adviceHeader = document.querySelector('#adviceSection h2');
-        adviceHeader.innerText = "Consultoria Inteligente (DeepSeek AI)";
-
-        // Se adicionou a lib 'marked' no passo 1, use marked.parse(aiText). 
-        // Se não, use apenas aiText (mas a formatação ficará crua).
-        const htmlContent = typeof marked !== 'undefined' 
-            ? marked.parse(aiText) 
-            : `<pre style="white-space: pre-wrap;">${aiText}</pre>`;
-
-        document.getElementById("adviceContent").innerHTML = `
-            <div class="advice-card">
-                ${htmlContent}
-            </div>
-            <div style="text-align:center; margin-top:10px; font-size:0.8rem; color:#777;">
-                Gerado por Inteligência Artificial (DeepSeek V3). Revise antes de aplicar.
-            </div>
-        `;
-
-        // Rolar até a seção
-        document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
-
-    } catch (error) {
-        console.error("Erro na IA:", error);
-        alert("Ocorreu um erro ao gerar a consultoria: " + error.message);
-    } finally {
-        hideLoading(); // Esconde o spinner
-    }
-}
-
-		
-		
-		// fim
-
-        // --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
+        // --- BACKUP & RESTORE ---
         function backupData() {
-            if(!currentUser) return;
-            // Cria arquivo JSON com os dados atuais do usuário
-            const backupObj = {
-                userProfile: { name: currentUser.name, email: currentUser.email },
-                diagnosisData: currentUser.diagnosisData
-            };
-            const blob = new Blob([JSON.stringify(backupObj)], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
+            const blob = new Blob([JSON.stringify(currentUser.diagnosisData)], {type: "application/json"});
             const a = document.createElement("a");
-            a.href = url;
-            a.download = "backup_firebase_" + new Date().toISOString().slice(0,10) + ".json";
-            document.body.appendChild(a);
+            a.href = URL.createObjectURL(blob);
+            a.download = `backup_${currentUser.name}_${Date.now()}.json`;
             a.click();
         }
 
         function restoreData() { document.getElementById('restoreInput').click(); }
-        
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async function(e) {
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const r = new FileReader();
+            r.onload = async (ev) => {
                 try {
-                    const content = JSON.parse(e.target.result);
-                    if(content.diagnosisData) {
-                        showLoading();
-                        // Carrega no form visualmente
-                        loadFormDataFromObject(content.diagnosisData);
-                        // Salva no Firebase
-                        await db.collection("users").doc(currentUser.uid).update({
-                            diagnosisData: content.diagnosisData
-                        });
-                        // Atualiza objeto local
-                        currentUser.diagnosisData = content.diagnosisData;
-                        
-                        hideLoading();
-                        alert("Dados restaurados e sincronizados com Firebase!");
-                    } else {
-                        alert("Arquivo de backup inválido.");
-                    }
-                } catch(err) { 
-                    alert("Erro ao ler arquivo: " + err.message); 
-                }
+                    const data = JSON.parse(ev.target.result);
+                    currentUser.diagnosisData = data;
+                    loadFormData(data);
+                    await saveToFirebase();
+                    alert("Restaurado com sucesso!");
+                    editForm(); // Volta para o form para conferir
+                } catch(err) { alert("Arquivo inválido"); }
             };
-            reader.readAsText(file);
+            r.readAsText(file);
         }
 
-        async function clearData() { 
-            if(confirm("Deseja limpar todos os dados do formulário no Firebase?")) {
-                form.reset();
-                await saveToFirebase();
-                location.reload(); 
-            } 
-        }
-
-        async function fillDemoData() {
-            if(!confirm("Isso substituirá os dados atuais por dados de teste completos.")) return;
-
-            // 1. Dados Completos e Realistas de Pequeno Comércio
-            const demoData = {
-                empresa_nome: "Loja Modelo & Estilo",
-                empresa_cnpj: "12.345.678/0001-90",
-                empresa_segmento: "Comércio Varejista de Roupas",
-                empresa_tempo: "5",
-                empresa_funcionarios: "4",
-                empresa_faturamento: "55000.00",
-                empresa_regime: "Simples Nacional",
-                empresa_publico: "B2C",
-                fin_controle: "Parcial",
-                fin_custos_fixos: "15000.00",
-                fin_custos_variaveis: "Taxas de cartão (3.5%), Comissões (3%), Impostos (Simples), Embalagens.",
-                fin_margem: "Nao",
-                fin_ponto_equilibrio: "Nao",
-                fin_dividas: "Empréstimo bancário (parcela de R$ 1.500).",
-                fin_fluxo_caixa: "Nao",
-                prec_metodo: "Multiplico o preço de custo por 2.0 (Markup).",
-                prec_top_vendas: "Camisetas, Calças Jeans, Acessórios.",
-                prec_menor_lucro: "Produtos em promoção ou ponta de estoque.",
-                prec_ticket_medio: "120.00",
-                prec_descontos: "5% para pagamento no PIX ou dinheiro.",
-                atend_canais: "WhatsApp, Instagram e Telefone.",
-                atend_tempo: "Ate 1h",
-                atend_posvenda: "Nao",
-                atend_reclamacoes: "Demora na entrega ou falta de numeração.",
-                vendas_canais_aquisicao: "Instagram, Fachada da loja, Indicação.",
-                vendas_funil: "Mais ou menos",
-                vendas_metas: "Nao",
-                vendas_perdas: "Cliente acha caro ou não tem o tamanho.",
-                promo_frequencia: "Sazonalmente",
-                promo_analise: "Nao",
-                mkt_redes: "Instagram e Facebook.",
-                mkt_frequencia: "2 a 3 vezes por semana.",
-                mkt_converte: "Pouco",
-                seo_gmn: "Sim",
-                seo_conteudo: "Nao",
-                ads_investe: "Sim",
-                ads_plataformas: "Instagram (Botão Turbinar)",
-                ads_valor: "300.00",
-                ads_cpl: "Nao",
-                site_possui: "Nao",
-                site_analytics: "Nao",
-                tec_erp: "Sistema de gestão básico (Bling/Tiny).",
-                tec_crm: "Nao",
-                tec_manual: "Muito",
-                mktp_vende: "Sim",
-                mktp_quais: "Shopee e Mercado Livre (iniciando).",
-                mktp_estoque: "Nao",
-                pp_funcoes: "Parcial",
-                pp_processos: "Nao",
-                pp_gargalos: "Falta de tempo para gestão, faço tudo sozinho(a).",
-                obj_problemas: "Sobra pouco dinheiro no fim do mês, não sei precificar corretamente.",
-                obj_perda_dinheiro: "Estoque parado e taxas de cartão.",
-                obj_principal: "Organizar o financeiro e aumentar o lucro.",
-                obj_metas: "Contratar um gerente e abrir e-commerce.",
-                obj_obs: "Preciso de ajuda urgente com fluxo de caixa."
+        function fillDemoData() {
+            if(!confirm("Substituir dados atuais por teste?")) return;
+            const demo = {
+                empresa_nome: "Loja Exemplo Ltda", empresa_segmento: "Moda Feminina", empresa_faturamento: "45000",
+                empresa_publico: "B2C", fin_controle: "Parcial", fin_custos_fixos: "12000", fin_custos_variaveis: "Taxas 4%, Comissões 3%",
+                fin_dividas: "Empréstimo R$ 20k", prec_metodo: "Markup 2.0", prec_ticket_medio: "150",
+                ads_investe: "Sim", ads_valor: "500", site_possui: "Nao", mkt_redes: "Instagram",
+                obj_problemas: "Baixo lucro e estoque parado", obj_metas: "Dobrar vendas online"
             };
-
-            // 2. Itera sobre o objeto e preenche o DOM
-            for (const key in demoData) {
-                const val = demoData[key];
-                const fields = document.getElementsByName(key);
-
-                if (fields.length > 0) {
-                    const field = fields[0]; 
-
-                    if (field.type === 'radio') {
-                        // Radio Buttons
-                        const radio = document.querySelector(`input[name="${key}"][value="${val}"]`);
-                        if (radio) radio.checked = true;
-                    } else {
-                        // Text, Number, Select, Textarea
-                        field.value = val;
-                    }
-                }
-            }
-
-            // 3. Controla visibilidade de campos condicionais
-            if (typeof toggleAdsDetail === 'function') toggleAdsDetail(demoData.ads_investe);
-            if (typeof toggleMktpDetail === 'function') toggleMktpDetail(demoData.mktp_vende);
-
-            // 4. Salva no Firebase
-            await saveToFirebase();
-            alert("Dados de teste preenchidos com sucesso!");
+            loadFormData(demo);
+            saveToFirebase();
         }
 
+        // Check Auth on Load
+        window.onload = function() {
+            if(auth) {
+                auth.onAuthStateChanged(async u => {
+                    if(u) {
+                        const d = await db.collection("users").doc(u.uid).get();
+                        if(d.exists) loginSuccess(u.uid, d.data());
+                    } else { authScreen.style.display = 'flex'; }
+                });
+            } else { authScreen.style.display = 'flex'; }
+        }
     </script>
 </body>
 </html>
-```
-Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
