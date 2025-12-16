@@ -1,28 +1,26 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
-// 🔐 Secret configurado via:
-// firebase functions:secrets:set DEEPSEEK_API_KEY
-const DEEPSEEK_API_KEY = defineSecret("DEEPSEEK_API_KEY");
+// 1. Mudamos a definição da Secret para o Gemini
+const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
-export const testarDeepSeekAPI = onRequest(
+// 2. Renomeamos a função para testarGeminiAPI (para coincidir com seu HTML)
+export const testarGeminiAPI = onRequest(
   {
     region: "us-central1",
-    secrets: [DEEPSEEK_API_KEY],
+    secrets: [GEMINI_API_KEY], // Injeta a chave do Google
   },
   async (req, res) => {
 
-    // ✅ CORS (OBRIGATÓRIO PARA HTML)
+    // ✅ CORS (Mantido igual)
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
 
-    // Pré-flight (navegador)
     if (req.method === "OPTIONS") {
       return res.status(204).send("");
     }
 
-    // Aceita apenas POST
     if (req.method !== "POST") {
       return res.status(405).json({
         sucesso: false,
@@ -31,44 +29,44 @@ export const testarDeepSeekAPI = onRequest(
     }
 
     try {
-      const apiKey = DEEPSEEK_API_KEY.value();
+      const apiKey = GEMINI_API_KEY.value();
 
       if (!apiKey) {
-        throw new Error("API Key DeepSeek não encontrada");
+        throw new Error("API Key do Gemini não encontrada nas Secrets");
       }
 
-      const prompt =
-        req.body?.prompt ||
-        "Explique em uma frase o que é inteligência artificial.";
+      const prompt = req.body?.prompt || "Diga olá";
 
-      const response = await fetch(
-        "https://api.deepseek.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [
-              { role: "user", content: prompt }
-            ],
-            temperature: 0.2
-          })
-        }
-      );
+      // 3. Endpoint do Gemini 1.5 Flash
+      // Nota: A API Key é passada na URL via ?key=
+	  // Substitua a linha do 'const url' por esta:
+           const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+      //const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        // 4. Payload específico do Gemini
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }]
+        })
+      });
 
       if (!response.ok) {
         const erroTexto = await response.text();
-        throw new Error(`Erro DeepSeek: ${erroTexto}`);
+        throw new Error(`Erro Gemini (${response.status}): ${erroTexto}`);
       }
 
       const data = await response.json();
 
+      // 5. Tratamento da resposta do Gemini
+      // Estrutura: data.candidates[0].content.parts[0].text
       const resultado =
-        data?.choices?.[0]?.message?.content ||
-        data?.choices?.[0]?.text ||
+        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
         "Sem resposta do modelo";
 
       return res.json({
@@ -77,8 +75,7 @@ export const testarDeepSeekAPI = onRequest(
       });
 
     } catch (erro) {
-      console.error("Erro:", erro);
-
+      console.error("Erro no Backend:", erro);
       return res.status(500).json({
         sucesso: false,
         erro: erro.message
