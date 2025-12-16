@@ -1,59 +1,87 @@
-const { onRequest } = require("firebase-functions/v2/https");
-const logger = require("firebase-functions/logger");
-const { VertexAI } = require("@google-cloud/vertexai");
+import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 
-exports.testarGeminiAPI = onRequest(
-  { region: "us-central1" },
+// 🔐 Secret configurado via:
+// firebase functions:secrets:set DEEPSEEK_API_KEY
+const DEEPSEEK_API_KEY = defineSecret("DEEPSEEK_API_KEY");
+
+export const testarDeepSeekAPI = onRequest(
+  {
+    region: "us-central1",
+    secrets: [DEEPSEEK_API_KEY],
+  },
   async (req, res) => {
 
-    // CORS
+    // ✅ CORS (OBRIGATÓRIO PARA HTML)
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
 
+    // Pré-flight (navegador)
     if (req.method === "OPTIONS") {
       return res.status(204).send("");
     }
 
+    // Aceita apenas POST
     if (req.method !== "POST") {
-      return res.status(405).json({ erro: "Método não permitido" });
+      return res.status(405).json({
+        sucesso: false,
+        erro: "Método não permitido. Use POST."
+      });
     }
 
     try {
-      const prompt = req.body?.prompt || "Responda apenas: conexão OK";
+      const apiKey = DEEPSEEK_API_KEY.value();
 
-      const vertexAI = new VertexAI({
-        project: process.env.GCLOUD_PROJECT,
-        location: "us-central1",
-      });
+      if (!apiKey) {
+        throw new Error("API Key DeepSeek não encontrada");
+      }
 
-      const model = vertexAI.getGenerativeModel({
-        model: "gemini-1.0-pro",
-      });
+      const prompt =
+        req.body?.prompt ||
+        "Explique em uma frase o que é inteligência artificial.";
 
-      const result = await model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
+      const response = await fetch(
+        "https://api.deepseek.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
           },
-        ],
-      });
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.2
+          })
+        }
+      );
 
-      const text =
-        result.response.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Sem resposta";
+      if (!response.ok) {
+        const erroTexto = await response.text();
+        throw new Error(`Erro DeepSeek: ${erroTexto}`);
+      }
 
-      res.json({
+      const data = await response.json();
+
+      const resultado =
+        data?.choices?.[0]?.message?.content ||
+        data?.choices?.[0]?.text ||
+        "Sem resposta do modelo";
+
+      return res.json({
         sucesso: true,
-        resultado: text,
+        resultado
       });
 
     } catch (erro) {
-      logger.error("Erro Gemini Vertex:", erro);
-      res.status(500).json({
+      console.error("Erro:", erro);
+
+      return res.status(500).json({
         sucesso: false,
-        erro: erro.message,
+        erro: erro.message
       });
     }
   }
