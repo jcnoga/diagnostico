@@ -1,20 +1,32 @@
+/**
+ * Firebase Cloud Function - Gemini API (HTTP direto)
+ * Compatível com:
+ * - Firebase Functions v2
+ * - Node.js 24
+ * - Secret Manager
+ * - GitHub Pages
+ */
+
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fetch = require("node-fetch");
+const { defineSecret } = require("firebase-functions/params");
 
-// Mude aqui para pegar a chave do ambiente (agora usando params)
-const { params } = require('firebase-functions');
-const API_KEY = params.GEMINI_API_KEY;  // Chave de ambiente
+// 🔐 Secret
+const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
 exports.testarGeminiAPI = onRequest(
-  { region: "us-central1" },
+  {
+    region: "us-central1",
+    secrets: [GEMINI_API_KEY],
+  },
   async (req, res) => {
-    // 🔥 CORS MANUAL (obrigatório para GitHub Pages)
+
+    // CORS
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
 
-    // 🔁 Preflight
     if (req.method === "OPTIONS") {
       return res.status(204).send("");
     }
@@ -25,25 +37,47 @@ exports.testarGeminiAPI = onRequest(
 
     try {
       const prompt =
-        req.body?.prompt || "Diga apenas: Backend online.";
+        req.body?.prompt || "Responda apenas: backend online.";
 
-      if (!API_KEY) {
-        throw new Error("API Key Gemini não encontrada");
+const response = await fetch(
+  `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [{ text: prompt }],
+        },
+      ],
+    }),
+  }
+);
+
+
+      if (!response.ok) {
+        const erroTexto = await response.text();
+        throw new Error(erroTexto);
       }
 
-      const genAI = new GoogleGenerativeAI(API_KEY);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-pro"
+      const data = await response.json();
+      const texto =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "Sem resposta";
+
+      res.json({
+        sucesso: true,
+        resultado: texto,
       });
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-
-      res.json({ resultado: text });
 
     } catch (erro) {
       logger.error("Erro Gemini:", erro);
-      res.status(500).json({ erro: erro.message });
+      res.status(500).json({
+        sucesso: false,
+        erro: erro.message,
+      });
     }
   }
 );
