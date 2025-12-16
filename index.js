@@ -2,10 +2,13 @@ const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
+// Mude aqui para pegar a chave do ambiente (agora usando params)
+const { params } = require('firebase-functions');
+const API_KEY = params.GEMINI_API_KEY;  // Chave de ambiente
+
 exports.testarGeminiAPI = onRequest(
   { region: "us-central1" },
   async (req, res) => {
-
     // 🔥 CORS MANUAL (obrigatório para GitHub Pages)
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -23,10 +26,6 @@ exports.testarGeminiAPI = onRequest(
     try {
       const prompt =
         req.body?.prompt || "Diga apenas: Backend online.";
-
-      const API_KEY =
-        process.env.GEMINI_API_KEY ||
-        require("firebase-functions").config().gemini.key;
 
       if (!API_KEY) {
         throw new Error("API Key Gemini não encontrada");
