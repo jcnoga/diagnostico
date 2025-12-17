@@ -1575,16 +1575,36 @@ const firebaseConfig = {
                 db = firebase.firestore();
                 console.log("Firebase inicializado com sucesso");
 
-                // --- NOVA FUNCIONALIDADE: LISTENER DE AUTH COM SEGURANÇA ---
-                auth.onAuthStateChanged((user) => {
+                // --- DETECTAR REABERTURA DE ABA (Adicionado conforme solicitação) ---
+                window.addEventListener("pageshow", function (event) {
+                  if (event.persisted) {
+                    location.reload();
+                  }
+                });
+
+                // --- LIMPEZA FORÇADA EM CASO DE ERRO (Adicionado conforme solicitação) ---
+                window.resetarAppCompleto = function() {
+                  fecharApp();
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  location.reload();
+                };
+
+                // --- LISTENER DE AUTH INTEGRADO (Lógica estrita solicitada) ---
+                auth.onAuthStateChanged(async (user) => {
+                    // 1. SEMPRE fecha qualquer estado anterior
+                    fecharApp();
+
                     if (user) {
-                        // Se houver usuário, inicia o app de forma segura
-                        iniciarAppSeguro(user);
+                        // 2. Define usuario global
+                        window.usuarioAtual = user;
+                        // 3. Inicia App (Usando a função existente que carrega dados)
+                        await iniciarApp(user);
                     } else {
-                        // Se não houver, limpa tudo e mostra login
-                        fecharApp();
+                        // 4. Mostra login
                         console.log("Nenhum usuário logado. Mostrando tela de login.");
                         hideLoading();
+                        currentUser = null; // Mantendo compatibilidade com variáveis legadas
                         authScreen.style.display = 'flex';
                         appContainer.style.display = 'none';
                         document.querySelector('header').style.display = 'none';
