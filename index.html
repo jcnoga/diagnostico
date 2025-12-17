@@ -1592,7 +1592,16 @@ const firebaseConfig = {
 
                 // --- LISTENER DE AUTH INTEGRADO (Lógica estrita solicitada) ---
                 auth.onAuthStateChanged(async (user) => {
-                    // 1. SEMPRE fecha qualquer estado anterior
+                    // --- NOVA PROTEÇÃO CONTRA LOOP DE LOGIN (FIX) ---
+                    // Se o usuário já está definido globalmente, é o mesmo UID, e o app diz que iniciou,
+                    // ignoramos o evento para não resetar a UI e travar a navegação.
+                    if (user && window.usuarioAtual && window.usuarioAtual.uid === user.uid && window.appIniciado) {
+                        console.log("Usuário já conectado e App iniciado. Ignorando reinicialização de listener.");
+                        return;
+                    }
+                    // ------------------------------------------------
+
+                    // 1. SEMPRE fecha qualquer estado anterior (se não for o mesmo usuário acima)
                     fecharApp();
 
                     if (user) {
@@ -2442,3 +2451,4 @@ const firebaseConfig = {
 </body>
 </html>
 ```
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
