@@ -1582,14 +1582,6 @@ const firebaseConfig = {
                   }
                 });
 
-                // --- LIMPEZA FORÇADA EM CASO DE ERRO (Adicionado conforme solicitação) ---
-                window.resetarAppCompleto = function() {
-                  fecharApp();
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  location.reload();
-                };
-
                 // --- LISTENER DE AUTH INTEGRADO (Lógica estrita solicitada) ---
                 auth.onAuthStateChanged(async (user) => {
                     // --- NOVA PROTEÇÃO CONTRA LOOP DE LOGIN (FIX) ---
