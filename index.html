@@ -1560,6 +1560,12 @@ const firebaseConfig = {
   measurementId: "G-6R39CB3R52"
 }
 
+        // --- GESTÃO DE ESTADOS E SEGURANÇA (NOVAS VARIÁVEIS) ---
+        window.unsubscribeListeners = [];
+        window.appTimers = [];
+        window.appIniciado = false;
+        window.usuarioAtual = null;
+
         // Inicializa Firebase
         let auth, db;
         try {
@@ -1569,41 +1575,15 @@ const firebaseConfig = {
                 db = firebase.firestore();
                 console.log("Firebase inicializado com sucesso");
 
-                // --- NOVA FUNCIONALIDADE: PERSISTÊNCIA E VERIFICAÇÃO AUTOMÁTICA ---
-                // Verifica o estado da autenticação imediatamente após a inicialização.
-                // Isso substitui a dependência de window.onload para login, garantindo
-                // que o app saiba se o usuário está logado mesmo após fechamento inadequado.
-                auth.onAuthStateChanged(async (user) => {
+                // --- NOVA FUNCIONALIDADE: LISTENER DE AUTH COM SEGURANÇA ---
+                auth.onAuthStateChanged((user) => {
                     if (user) {
-                        // Se houver usuário (persitido ou novo login), inicia o app
-                        console.log("Sessão ativa detectada para: ", user.email);
-                        
-                        // Lógica de "iniciarApp" adaptada para a estrutura existente
-                        if (!currentUser) {
-                            showLoading();
-                            try {
-                                const doc = await db.collection("users").doc(user.uid).get();
-                                if (doc.exists) {
-                                    await loginSuccess(user.uid, doc.data());
-                                } else {
-                                    // Sessão existe mas sem dados no banco (inconsistência)
-                                    console.warn("Usuário autenticado mas sem dados de perfil.");
-                                    auth.signOut();
-                                    hideLoading();
-                                    switchAuthView('loginView'); // Mostra tela de login
-                                }
-                            } catch (e) {
-                                console.error("Erro ao recuperar sessão:", e);
-                                hideLoading();
-                                // Fallback para tela de login
-                                authScreen.style.display = 'flex';
-                            }
-                        }
+                        // Se houver usuário, inicia o app de forma segura
+                        iniciarAppSeguro(user);
                     } else {
-                        // Se não houver usuário, garante que a tela de login seja mostrada
-                        // Lógica de "mostrarTelaLogin"
+                        // Se não houver, limpa tudo e mostra login
+                        fecharApp();
                         console.log("Nenhum usuário logado. Mostrando tela de login.");
-                        currentUser = null;
                         hideLoading();
                         authScreen.style.display = 'flex';
                         appContainer.style.display = 'none';
@@ -1616,6 +1596,66 @@ const firebaseConfig = {
             }
         } catch (e) {
             console.error("Erro ao inicializar Firebase:", e);
+        }
+
+        // --- NOVAS FUNÇÕES DE SEGURANÇA SOLICITADAS ---
+
+        function fecharApp() {
+            console.log("Encerrando app...");
+            
+            // Remover listeners do Firestore
+            if (window.unsubscribeListeners) {
+                window.unsubscribeListeners.forEach(unsub => {
+                    if (typeof unsub === 'function') unsub();
+                });
+                window.unsubscribeListeners = [];
+            }
+            
+            // Cancelar estados globais
+            window.appIniciado = false;
+            window.usuarioAtual = null;
+            currentUser = null; // Sincroniza com a variável global existente
+            
+            // Limpar timers
+            // Limpa o timer de auto-save específico existente
+            if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
+            
+            if (window.appTimers) {
+                window.appTimers.forEach(t => clearTimeout(t));
+                window.appTimers = [];
+            }
+        }
+
+        async function iniciarApp(user) {
+             console.log("Sessão ativa detectada para: ", user.email);
+             window.appIniciado = true;
+             
+             // Lógica de recuperação de sessão existente
+             if (!currentUser) {
+                 showLoading();
+                 try {
+                     const doc = await db.collection("users").doc(user.uid).get();
+                     if (doc.exists) {
+                         await loginSuccess(user.uid, doc.data());
+                     } else {
+                         // Sessão existe mas sem dados no banco (inconsistência)
+                         console.warn("Usuário autenticado mas sem dados de perfil.");
+                         auth.signOut();
+                         hideLoading();
+                         switchAuthView('loginView'); 
+                     }
+                 } catch (e) {
+                     console.error("Erro ao recuperar sessão:", e);
+                     hideLoading();
+                     // Fallback para tela de login
+                     authScreen.style.display = 'flex';
+                 }
+             }
+        }
+
+        async function iniciarAppSeguro(user) {
+            fecharApp();      // ⛔ fecha tudo primeiro
+            await iniciarApp(user); // ✅ inicia do zero
         }
 
         // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
@@ -1781,6 +1821,7 @@ const firebaseConfig = {
 
             // Atualiza objeto local
             currentUser = { uid: uid, ...userData };
+            window.usuarioAtual = currentUser; // Sincroniza com a nova variável global
 
             // Verifica Expiração (Regra 4)
             if (nowTime > userData.license.expiration) {
@@ -1820,7 +1861,7 @@ const firebaseConfig = {
         function handleLogout() {
             if(auth) {
                 auth.signOut().then(() => {
-                    currentUser = null;
+                    fecharApp(); // Garante limpeza ao sair
                     location.reload();
                 });
             } else {
@@ -1828,9 +1869,6 @@ const firebaseConfig = {
             }
         }
 
-        // --- ATUALIZAÇÃO: REMOVIDA LÓGICA ANTIGA DO WINDOW.ONLOAD ---
-        // A lógica de verificação de sessão foi movida para o 'auth.onAuthStateChanged'
-        // logo após a inicialização do Firebase para evitar falhas de carregamento.
         window.onload = function() {
             if(!auth) {
                  // Fallback se firebase não carregar
@@ -1845,8 +1883,10 @@ const firebaseConfig = {
         
         form.querySelectorAll("input, select, textarea").forEach(field => {
             field.addEventListener("input", () => {
-                clearTimeout(timeoutId);
+                if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
+                // Adiciona o novo timer ao array global para gestão segura
                 timeoutId = setTimeout(saveToFirebase, 2000); // Debounce 2s
+                window.appTimers.push(timeoutId);
             });
             field.addEventListener("change", saveToFirebase);
         });
