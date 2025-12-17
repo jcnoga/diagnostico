@@ -1568,6 +1568,49 @@ const firebaseConfig = {
                 auth = firebase.auth();
                 db = firebase.firestore();
                 console.log("Firebase inicializado com sucesso");
+
+                // --- NOVA FUNCIONALIDADE: PERSISTÊNCIA E VERIFICAÇÃO AUTOMÁTICA ---
+                // Verifica o estado da autenticação imediatamente após a inicialização.
+                // Isso substitui a dependência de window.onload para login, garantindo
+                // que o app saiba se o usuário está logado mesmo após fechamento inadequado.
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        // Se houver usuário (persitido ou novo login), inicia o app
+                        console.log("Sessão ativa detectada para: ", user.email);
+                        
+                        // Lógica de "iniciarApp" adaptada para a estrutura existente
+                        if (!currentUser) {
+                            showLoading();
+                            try {
+                                const doc = await db.collection("users").doc(user.uid).get();
+                                if (doc.exists) {
+                                    await loginSuccess(user.uid, doc.data());
+                                } else {
+                                    // Sessão existe mas sem dados no banco (inconsistência)
+                                    console.warn("Usuário autenticado mas sem dados de perfil.");
+                                    auth.signOut();
+                                    hideLoading();
+                                    switchAuthView('loginView'); // Mostra tela de login
+                                }
+                            } catch (e) {
+                                console.error("Erro ao recuperar sessão:", e);
+                                hideLoading();
+                                // Fallback para tela de login
+                                authScreen.style.display = 'flex';
+                            }
+                        }
+                    } else {
+                        // Se não houver usuário, garante que a tela de login seja mostrada
+                        // Lógica de "mostrarTelaLogin"
+                        console.log("Nenhum usuário logado. Mostrando tela de login.");
+                        currentUser = null;
+                        hideLoading();
+                        authScreen.style.display = 'flex';
+                        appContainer.style.display = 'none';
+                        document.querySelector('header').style.display = 'none';
+                    }
+                });
+
             } else {
                 console.warn("Firebase Config não preenchido. As funcionalidades de nuvem não funcionarão.");
             }
@@ -1785,38 +1828,15 @@ const firebaseConfig = {
             }
         }
 
-        // Verifica sessão ativa ao recarregar página (Persistência de Sessão)
+        // --- ATUALIZAÇÃO: REMOVIDA LÓGICA ANTIGA DO WINDOW.ONLOAD ---
+        // A lógica de verificação de sessão foi movida para o 'auth.onAuthStateChanged'
+        // logo após a inicialização do Firebase para evitar falhas de carregamento.
         window.onload = function() {
-            if(auth) {
-                auth.onAuthStateChanged(async (user) => {
-                    if (user) {
-                        // Usuário já logado no Firebase Auth
-                        if(!currentUser) {
-                            showLoading();
-                            try {
-                                const doc = await db.collection("users").doc(user.uid).get();
-                                if(doc.exists) {
-                                    await loginSuccess(user.uid, doc.data());
-                                } else {
-                                    // Sessão existe mas sem dados? Logout.
-                                    auth.signOut();
-                                    hideLoading();
-                                }
-                            } catch(e) {
-                                console.error(e);
-                                hideLoading();
-                            }
-                        }
-                    } else {
-                        // Ninguém logado, mostra tela de auth
-                        authScreen.style.display = 'flex';
-                        hideLoading(); // Remove overlay inicial se houver
-                    }
-                });
-            } else {
+            if(!auth) {
                  // Fallback se firebase não carregar
                  authScreen.style.display = 'flex';
             }
+            // A verificação de usuário agora ocorre automaticamente pelo listener do auth.
         };
 
         // --- SALVAMENTO DE DADOS (AUTO-SAVE NO FIRESTORE) ---
@@ -2362,4 +2382,3 @@ const firebaseConfig = {
 </body>
 </html>
 ```
-Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
