@@ -852,6 +852,8 @@
             <h3>Renovação Antecipada</h3>
             <p style="font-size: 0.9rem; margin-bottom: 10px;">Caso deseje estender seu prazo antes do vencimento.</p>
             <button class="btn-demo" onclick="openLockScreenForRenewal()">Inserir Código de Renovação</button>
+            <hr style="margin: 15px 0;">
+            <button class="btn-reset" onclick="limpezaForcada()" style="background-color: #c0392b; width:100%">⚠️ Limpeza Forçada (Reset App)</button>
         </div>
     </div>
 
@@ -1565,6 +1567,7 @@ const firebaseConfig = {
         window.appTimers = [];
         window.appIniciado = false;
         window.usuarioAtual = null;
+        let appInicializado = false;
 
         // Inicializa Firebase
         let auth, db;
@@ -1582,42 +1585,22 @@ const firebaseConfig = {
                   }
                 });
 
-                // --- LIMPEZA FORÇADA EM CASO DE ERRO (Adicionado conforme solicitação) ---
-                window.resetarAppCompleto = function() {
-                  fecharApp();
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  location.reload();
-                };
-
-                // --- LISTENER DE AUTH INTEGRADO (Lógica estrita solicitada) ---
+                // --- LISTENER DE AUTH INTEGRADO COM ROTINA DE LIMPEZA ---
                 auth.onAuthStateChanged(async (user) => {
-                    // --- NOVA PROTEÇÃO CONTRA LOOP DE LOGIN (FIX CORRIGIDO) ---
-                    // Se temos usuário
+                    if (appInicializado) return;
+                    appInicializado = true;
+
                     if (user) {
-                        // Verifica se o estado da aplicação JÁ é desse usuário (evita reload desnecessário e loop)
-                        // AQUI ESTÁ A CORREÇÃO: Força a UI a aparecer caso esteja escondida
-                        if (currentUser && currentUser.uid === user.uid && window.appIniciado) {
-                            console.log("Usuário já carregado. Restaurando UI se necessário...");
-                            hideLoading();
-                            authScreen.style.display = 'none';
-                            appContainer.style.display = 'block';
-                            document.querySelector('header').style.display = 'block';
-                            return;
+                        // Se usuário detectado, força logout para evitar estado inconsistente
+                        console.log("Detectado usuário na inicialização. Forçando logout para garantir estado limpo.");
+                        try {
+                            await auth.signOut();
+                        } catch(e) {
+                            console.warn("Erro no logout forçado:", e);
                         }
-                        
-                        // Se é um login novo ou troca de usuário, limpa tudo antes
-                        fecharApp();
-                        window.usuarioAtual = user;
-                        await iniciarApp(user);
+                        mostrarTelaLogin();
                     } else {
-                        // 4. Mostra login
-                        console.log("Nenhum usuário logado. Mostrando tela de login.");
-                        hideLoading();
-                        currentUser = null; // Mantendo compatibilidade com variáveis legadas
-                        authScreen.style.display = 'flex';
-                        appContainer.style.display = 'none';
-                        document.querySelector('header').style.display = 'none';
+                        mostrarTelaLogin();
                     }
                 });
 
@@ -1628,7 +1611,32 @@ const firebaseConfig = {
             console.error("Erro ao inicializar Firebase:", e);
         }
 
-        // --- NOVAS FUNÇÕES DE SEGURANÇA SOLICITADAS ---
+        // --- NOVAS FUNÇÕES DE SEGURANÇA E UI SOLICITADAS ---
+
+        function mostrarTelaLogin() {
+            // Garante que a UI esteja no estado de Login
+            if(document.getElementById('loadingOverlay')) document.getElementById('loadingOverlay').style.display = 'none';
+            if(document.getElementById('authScreen')) document.getElementById('authScreen').style.display = 'flex';
+            if(document.querySelector('.container')) document.querySelector('.container').style.display = 'none';
+            if(document.querySelector('header')) document.querySelector('header').style.display = 'none';
+            // Reseta variáveis globais
+            currentUser = null;
+            window.usuarioAtual = null;
+        }
+
+        function limpezaForcada() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                // Tenta deletar banco interno do Firebase Auth para reset total
+                if (window.indexedDB) {
+                    const req = window.indexedDB.deleteDatabase("firebaseLocalStorageDb");
+                    req.onsuccess = function () { console.log("DB Deleted"); };
+                    req.onerror = function () { console.log("DB Delete error"); };
+                }
+            } catch(e) { console.error(e); }
+            location.reload();
+        }
 
         function fecharApp() {
             console.log("Encerrando app...");
@@ -1644,10 +1652,9 @@ const firebaseConfig = {
             // Cancelar estados globais
             window.appIniciado = false;
             window.usuarioAtual = null;
-            currentUser = null; // Sincroniza com a variável global existente
+            currentUser = null; 
             
             // Limpar timers
-            // Limpa o timer de auto-save específico existente
             if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
             
             if (window.appTimers) {
@@ -2452,4 +2459,4 @@ const firebaseConfig = {
 </body>
 </html>
 ```
-
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
