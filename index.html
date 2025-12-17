@@ -1582,24 +1582,33 @@ const firebaseConfig = {
                   }
                 });
 
+                // --- LIMPEZA FORÇADA EM CASO DE ERRO (Adicionado conforme solicitação) ---
+                window.resetarAppCompleto = function() {
+                  fecharApp();
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  location.reload();
+                };
+
                 // --- LISTENER DE AUTH INTEGRADO (Lógica estrita solicitada) ---
                 auth.onAuthStateChanged(async (user) => {
-                    // --- NOVA PROTEÇÃO CONTRA LOOP DE LOGIN (FIX) ---
-                    // Se o usuário já está definido globalmente, é o mesmo UID, e o app diz que iniciou,
-                    // ignoramos o evento para não resetar a UI e travar a navegação.
-                    if (user && window.usuarioAtual && window.usuarioAtual.uid === user.uid && window.appIniciado) {
-                        console.log("Usuário já conectado e App iniciado. Ignorando reinicialização de listener.");
-                        return;
-                    }
-                    // ------------------------------------------------
-
-                    // 1. SEMPRE fecha qualquer estado anterior (se não for o mesmo usuário acima)
-                    fecharApp();
-
+                    // --- NOVA PROTEÇÃO CONTRA LOOP DE LOGIN (FIX CORRIGIDO) ---
+                    // Se temos usuário
                     if (user) {
-                        // 2. Define usuario global
+                        // Verifica se o estado da aplicação JÁ é desse usuário (evita reload desnecessário e loop)
+                        // AQUI ESTÁ A CORREÇÃO: Força a UI a aparecer caso esteja escondida
+                        if (currentUser && currentUser.uid === user.uid && window.appIniciado) {
+                            console.log("Usuário já carregado. Restaurando UI se necessário...");
+                            hideLoading();
+                            authScreen.style.display = 'none';
+                            appContainer.style.display = 'block';
+                            document.querySelector('header').style.display = 'block';
+                            return;
+                        }
+                        
+                        // Se é um login novo ou troca de usuário, limpa tudo antes
+                        fecharApp();
                         window.usuarioAtual = user;
-                        // 3. Inicia App (Usando a função existente que carrega dados)
                         await iniciarApp(user);
                     } else {
                         // 4. Mostra login
@@ -2443,4 +2452,4 @@ const firebaseConfig = {
 </body>
 </html>
 ```
-Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
+
