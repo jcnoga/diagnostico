@@ -1,922 +1,1245 @@
-// Verifica se está rodando via arquivo local (file://)
-if (window.location.protocol === 'file:') {
-    // Pára o carregamento e exibe mensagem de erro
-    document.body.innerHTML = `
-        <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#2c3e50; color:white; font-family:sans-serif; text-align:center;">
-            <div>
-                <h1 style="color:#e74c3c; font-size:3rem;">⚠️ Execução Bloqueada</h1>
-                <p style="font-size:1.2rem; margin-top:20px;">Por motivos de segurança e conexão com o Firebase, <br>este aplicativo não pode ser executado diretamente pelo arquivo.</p>
-                <hr style="border-color:#555; margin:20px 0;">
-                <p><strong>Como resolver:</strong></p>
-                <p>Utilize um servidor local (ex: VS Code Live Server, XAMPP, Python http.server)<br>ou hospede a aplicação na web.</p>
-                <p style="color:#f1c40f; margin-top:15px;">O endereço deve começar com <strong>http://</strong> ou <strong>https://</strong></p>
-            </div>
-        </div>
-    `;
-    // Lança um erro para parar a execução do restante dos scripts
-    throw new Error("Execução via file:// bloqueada por segurança.");
-}
+const DEFAULT_URL_FISCAL = "https://www.nfse.gov.br/EmissorNacional/Login?ReturnUrl=%2fEmissorNacional";
+const DEFAULT_URL_DAS = "https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/pgmei.app/Identificacao";
+const DB_KEY = 'MEI_SYSTEM_V12_8'; 
+const ADMIN_EMAILS = ['jcnvap@gmail.com', 'jcnval@gmail.com']; 
 
-// --- 1. CONFIGURAÇÃO DO FIREBASE ---
+// --- CONFIGURAÇÃO DE EMAIL VIA CLOUD FUNCTION (BACKEND FIREBASE) ---
+const CLOUD_FUNCTION_URL = "https://testemanualemail-cg2cq35buq-uc.a.run.app";
+
+const LIC_PAD_VAL = 13;
+const LIC_MULT_FACTOR = 9;
+const LIC_YEAR_BASE = 1954;
+
+// CONFIGURAÇÃO FIREBASE
 const firebaseConfig = {
-  apiKey: "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM",
-  authDomain: "diagnostico-a2247.firebaseapp.com",
-  projectId: "diagnostico-a2247",
-  storageBucket: "diagnostico-a2247.firebasestorage.app",
-  messagingSenderId: "125978207628",
-  appId: "1:125978207628:web:f5135603051550de1fe2a9",
-  measurementId: "G-6R39CB3R52"
-}
-
-// --- GESTÃO DE ESTADOS E SEGURANÇA (NOVAS VARIÁVEIS) ---
-window.unsubscribeListeners = [];
-window.appTimers = [];
-window.appIniciado = false;
-window.usuarioAtual = null;
-let appInicializado = false;
-
-// Inicializa Firebase
-let auth, db;
-try {
-    if (firebaseConfig.apiKey !== "COLE_SUA_API_KEY_AQUI") {
-        firebase.initializeApp(firebaseConfig);
-        auth = firebase.auth();
-        db = firebase.firestore();
-        console.log("Firebase inicializado com sucesso");
-
-        // --- DETECTAR REABERTURA DE ABA (Adicionado conforme solicitação) ---
-        window.addEventListener("pageshow", function (event) {
-          if (event.persisted) {
-            location.reload();
-          }
-        });
-
-        // --- LISTENER DE AUTH INTEGRADO COM ROTINA DE LIMPEZA ---
-        auth.onAuthStateChanged(async (user) => {
-            if (appInicializado) return;
-            appInicializado = true;
-
-            if (user) {
-                // Se usuário detectado, força logout para evitar estado inconsistente
-                console.log("Detectado usuário na inicialização. Forçando logout para garantir estado limpo.");
-                try {
-                    await auth.signOut();
-                } catch(e) {
-                    console.warn("Erro no logout forçado:", e);
-                }
-                mostrarTelaLogin();
-            } else {
-                mostrarTelaLogin();
-            }
-        });
-
-    } else {
-        console.warn("Firebase Config não preenchido. As funcionalidades de nuvem não funcionarão.");
-    }
-} catch (e) {
-    console.error("Erro ao inicializar Firebase:", e);
-}
-
-// --- NOVAS FUNÇÕES DE SEGURANÇA E UI SOLICITADAS ---
-
-function mostrarTelaLogin() {
-    // Garante que a UI esteja no estado de Login
-    if(document.getElementById('loadingOverlay')) document.getElementById('loadingOverlay').style.display = 'none';
-    if(document.getElementById('authScreen')) document.getElementById('authScreen').style.display = 'flex';
-    if(document.querySelector('.container')) document.querySelector('.container').style.display = 'none';
-    if(document.querySelector('header')) document.querySelector('header').style.display = 'none';
-    // Reseta variáveis globais
-    currentUser = null;
-    window.usuarioAtual = null;
-}
-
-function limpezaForcada() {
-    try {
-        localStorage.clear();
-        sessionStorage.clear();
-        // Tenta deletar banco interno do Firebase Auth para reset total
-        if (window.indexedDB) {
-            const req = window.indexedDB.deleteDatabase("firebaseLocalStorageDb");
-            req.onsuccess = function () { console.log("DB Deleted"); };
-            req.onerror = function () { console.log("DB Delete error"); };
-        }
-    } catch(e) { console.error(e); }
-    location.reload();
-}
-
-function fecharApp() {
-    console.log("Encerrando app...");
-    
-    // Remover listeners do Firestore
-    if (window.unsubscribeListeners) {
-        window.unsubscribeListeners.forEach(unsub => {
-            if (typeof unsub === 'function') unsub();
-        });
-        window.unsubscribeListeners = [];
-    }
-    
-    // Cancelar estados globais
-    window.appIniciado = false;
-    window.usuarioAtual = null;
-    currentUser = null; 
-    
-    // Limpar timers
-    if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
-    
-    if (window.appTimers) {
-        window.appTimers.forEach(t => clearTimeout(t));
-        window.appTimers = [];
-    }
-}
-
-async function iniciarApp(user) {
-     console.log("Sessão ativa detectada para: ", user.email);
-     window.appIniciado = true;
-     
-     // Lógica de recuperação de sessão existente
-     if (!currentUser) {
-         showLoading();
-         try {
-             const doc = await db.collection("users").doc(user.uid).get();
-             if (doc.exists) {
-                 await loginSuccess(user.uid, doc.data());
-             } else {
-                 // Sessão existe mas sem dados no banco (inconsistência)
-                 console.warn("Usuário autenticado mas sem dados de perfil.");
-                 auth.signOut();
-                 hideLoading();
-                 switchAuthView('loginView'); 
-             }
-         } catch (e) {
-             console.error("Erro ao recuperar sessão:", e);
-             hideLoading();
-             // Fallback para tela de login
-             authScreen.style.display = 'flex';
-         }
-     }
-}
-
-async function iniciarAppSeguro(user) {
-    fecharApp();      // ⛔ fecha tudo primeiro
-    await iniciarApp(user); // ✅ inicia do zero
-}
-
-// --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
-const CONST_ADD = 13;
-const CONST_MULT = 9;
-const CONST_BASE = 1954;
-let generatedRandomNumber = 0; 
-
-// --- ESTADO DA APLICAÇÃO ---
-let currentUser = null; 
-
-// --- Elementos DOM ---
-const authScreen = document.getElementById('authScreen');
-const appContainer = document.querySelector('.container');
-const userDisplay = document.getElementById('userWelcomeDisplay');
-const reportUserSpan = document.getElementById('reportUser');
-const lockScreen = document.getElementById('lockScreen');
-const loadingOverlay = document.getElementById('loadingOverlay');
-
-function showLoading() { loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
-
-// --- AUTH & FIRESTORE LOGIC ---
-
-function switchAuthView(viewId) {
-    document.querySelectorAll('.auth-view').forEach(v => v.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
-}
-
-async function handleRegister(e) {
-    e.preventDefault();
-    const name = document.getElementById('regName').value;
-    const email = document.getElementById('regEmail').value;
-    const pass = document.getElementById('regPass').value;
-
-    if(!name || !email || !pass) return alert("Preencha todos os campos.");
-    if(!auth) return alert("Erro: Firebase não configurado no código.");
-
-    showLoading();
-    try {
-        // 1. Cria usuário no Authentication
-        const userCred = await auth.createUserWithEmailAndPassword(email, pass);
-        const uid = userCred.user.uid;
-
-        // 2. Prepara dados da licença (30 dias grátis ou Admin)
-        const now = new Date();
-        let expirationTime;
-
-        // Regra 6: Admin tem 9999 dias
-        if (email === 'jcnvap@gmail.com') {
-            expirationTime = now.getTime() + (9999 * 24 * 60 * 60 * 1000);
-        } else {
-            // Regra 2: 30 dias grátis
-            expirationTime = now.getTime() + (30 * 24 * 60 * 60 * 1000);
-        }
-
-        const userData = {
-            name: name,
-            email: email,
-            role: (email === 'jcnvap@gmail.com') ? 'admin' : 'user',
-            license: {
-                expiration: expirationTime,
-                lastAccess: now.getTime()
-            },
-            diagnosisData: {} // Dados do formulário vazio
-        };
-
-        // 3. Salva no Firestore
-        await db.collection("users").doc(uid).set(userData);
-        
-        alert("Conta criada com sucesso no Firebase!");
-        // Login automático após cadastro
-        await loginSuccess(uid, userData);
-
-    } catch (error) {
-        console.error(error);
-        let msg = "Erro ao cadastrar: " + error.message;
-        if(error.code === 'auth/email-already-in-use') msg = "E-mail já está em uso.";
-        if(error.code === 'auth/weak-password') msg = "A senha deve ter pelo menos 6 caracteres.";
-        alert(msg);
-    } finally {
-        hideLoading();
-    }
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById('loginEmail').value;
-    const pass = document.getElementById('loginPass').value;
-
-    if(!auth) return alert("Erro: Firebase não configurado.");
-
-    showLoading();
-    try {
-        const userCred = await auth.signInWithEmailAndPassword(email, pass);
-        const uid = userCred.user.uid;
-        
-        // Busca dados no Firestore
-        const doc = await db.collection("users").doc(uid).get();
-        if (doc.exists) {
-            await loginSuccess(uid, doc.data());
-        } else {
-            // Usuário existe no Auth mas não no Firestore (fallback de integridade)
-            alert("Dados do perfil não encontrados. Entre em contato com suporte.");
-            auth.signOut();
-        }
-    } catch (error) {
-        console.error(error);
-        alert("Erro ao entrar: " + error.message);
-    } finally {
-        hideLoading();
-    }
-}
-
-async function handleForgot(e) {
-    e.preventDefault();
-    const email = document.getElementById('forgotEmail').value;
-    if(!auth) return;
-    
-    showLoading();
-    try {
-        await auth.sendPasswordResetEmail(email);
-        alert("Link de redefinição enviado para " + email);
-        switchAuthView('loginView');
-    } catch (error) {
-        alert("Erro: " + error.message);
-    } finally {
-        hideLoading();
-    }
-}
-
-// Função central de validação de acesso
-async function loginSuccess(uid, userData) {
-    const nowTime = Date.now();
-    
-    // Regra 6: Reforço de Admin caso o banco esteja desatualizado
-    if (userData.email === 'jcnvap@gmail.com') {
-        const minAdminExp = nowTime + (1000 * 60 * 60 * 24 * 365);
-        if (userData.license.expiration < minAdminExp) {
-             userData.license.expiration = nowTime + (9999 * 24 * 60 * 60 * 1000); 
-        }
-    }
-
-    // Regra 5: Validação de data retroativa
-    // Tolerância de 2 minutos para diferenças de relógio
-    if (userData.license.lastAccess > nowTime + 120000) { 
-        alert("Erro de segurança: A data do seu dispositivo parece estar errada (atrasada em relação ao último acesso registrado). Por favor, ajuste o relógio.");
-        hideLoading();
-        // Não permite prosseguir
-        return;
-    }
-
-    // Atualiza lastAccess no banco (Persistência da Regra 5)
-    // Fazemos isso sem esperar (fire and forget) para não travar a UI, ou esperamos se for crítico.
-    // Aqui vamos esperar para garantir consistência.
-    userData.license.lastAccess = nowTime;
-    
-    await db.collection("users").doc(uid).update({ 
-        "license.lastAccess": nowTime,
-        // Atualiza expiração caso tenha sido corrigida pelo admin check
-        "license.expiration": userData.license.expiration 
-    });
-
-    // Atualiza objeto local
-    currentUser = { uid: uid, ...userData };
-    window.usuarioAtual = currentUser; // Sincroniza com a nova variável global
-
-    // Verifica Expiração (Regra 4)
-    if (nowTime > userData.license.expiration) {
-        authScreen.style.display = 'none';
-        lockScreen.style.display = 'flex'; // Exibe tela de bloqueio
-        hideLoading();
-        return;
-    }
-
-    // Sucesso: Libera App
-    proceedToApp();
-}
-
-function proceedToApp() {
-    authScreen.style.display = 'none';
-    lockScreen.style.display = 'none';
-    appContainer.style.display = 'block'; 
-    document.querySelector('.nav-buttons').style.display = 'flex';
-    document.querySelector('header').style.display = 'block';
-    document.querySelector('.progress-container').style.display = 'block';
-    
-    userDisplay.textContent = `Olá, ${currentUser.name}`;
-    reportUserSpan.textContent = currentUser.name;
-
-    updateDaysBadge();
-    
-    // Carregar dados salvos no Firestore para o formulário
-    if (currentUser.diagnosisData) {
-        loadFormDataFromObject(currentUser.diagnosisData);
-    }
-
-    // Regra 7: Botão IA visível para todos
-    const btnAi = document.querySelector('.btn-ai');
-    btnAi.style.display = 'inline-flex';
-}
-
-function handleLogout() {
-    if(auth) {
-        auth.signOut().then(() => {
-            fecharApp(); // Garante limpeza ao sair
-            location.reload();
-        });
-    } else {
-        location.reload();
-    }
-}
-
-window.onload = function() {
-    if(!auth) {
-         // Fallback se firebase não carregar
-         authScreen.style.display = 'flex';
-    }
-    // A verificação de usuário agora ocorre automaticamente pelo listener do auth.
+  apiKey: "AIzaSyBhtwWew_DQNX2TZROUShZz4mjK57pRgQk",
+  authDomain: "lembrete-d6c15.firebaseapp.com",
+  projectId: "lembrete-d6c15",
+  storageBucket: "lembrete-d6c15.firebasestorage.app",
+  messagingSenderId: "368296869868",
+  appId: "1:368296869868:web:c6189a5ab9634029a90ac9",
+  measurementId: "G-F5TMMGPK9C"
 };
 
-// --- SALVAMENTO DE DADOS (AUTO-SAVE NO FIRESTORE) ---
-let timeoutId;
-const form = document.getElementById("diagnosisForm");
-
-form.querySelectorAll("input, select, textarea").forEach(field => {
-    field.addEventListener("input", () => {
-        if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
-        // Adiciona o novo timer ao array global para gestão segura
-        timeoutId = setTimeout(saveToFirebase, 2000); // Debounce 2s
-        window.appTimers.push(timeoutId);
-    });
-    field.addEventListener("change", saveToFirebase);
-});
-
-async function saveToFirebase() {
-    if(!currentUser || !currentUser.uid) return;
+const DataManager = {
+    dbName: 'MEI_DB_HYBRID_V2',
+    storeName: 'mei_data',
     
-    const formData = new FormData(form);
-    const data = {};
-    formData.forEach((value, key) => {
-        data[key] = value;
-    });
+    async initDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(this.dbName, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    db.createObjectStore(this.storeName);
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
 
-    // Atualiza objeto local
-    currentUser.diagnosisData = data;
+    async save(data) {
+        // 1. Salva Localmente (Garantia Offline)
+        try { localStorage.setItem(DB_KEY, JSON.stringify(data)); } catch(e) { console.warn("LocalStorage cheiou"); }
 
-    // UI de salvamento
-    const cloudStatus = document.querySelector('.cloud-status');
-    if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Salvando...`;
+        try {
+            const db = await this.initDB();
+            const tx = db.transaction(this.storeName, 'readwrite');
+            tx.objectStore(this.storeName).put(data, 'main_data');
+        } catch(e) { console.error("Erro IDB Local", e); }
+
+        // 2. Tenta Sincronizar com a Nuvem
+        if (typeof firebase !== 'undefined' && firebase.apps.length && data.currentUser) {
+            try {
+                if (navigator.onLine) {
+                    const db = firebase.firestore();
+                    // Limpeza profunda do objeto para evitar erros do Firestore
+                    const cleanData = JSON.parse(JSON.stringify(data));
+                    await db.collection('users').doc(data.currentUser.id).set(cleanData);
+                    this.updateSyncStatus(true);
+                } else {
+                    this.updateSyncStatus(false);
+                }
+            } catch(e) { 
+                console.warn("Erro no Sync Cloud (Modo Offline Ativo):", e.code, e.message);
+                this.updateSyncStatus(false);
+            }
+        } else {
+            this.updateSyncStatus(false);
+        }
+    },
+
+    async pullCloudData(userId) {
+        if (typeof firebase !== 'undefined' && firebase.apps.length && navigator.onLine) {
+            try {
+                const db = firebase.firestore();
+                const doc = await db.collection('users').doc(userId).get();
+                if (doc.exists) {
+                    console.log("Dados baixados da nuvem.");
+                    return doc.data();
+                }
+            } catch (e) {
+                console.error("Falha ao baixar dados Cloud:", e);
+                if (e.code === 'permission-denied') {
+                    alert("Erro de Permissão no Firebase: Verifique as Regras do Firestore.");
+                }
+            }
+        }
+        return null;
+    },
+
+    async load() {
+        let data = null;
+        try {
+            const db = await this.initDB();
+            data = await new Promise(resolve => {
+                const tx = db.transaction(this.storeName, 'readonly');
+                const req = tx.objectStore(this.storeName).get('main_data');
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+            });
+        } catch(e) { console.warn("Erro carga IDB", e); }
+
+        if (!data) {
+            const ls = localStorage.getItem(DB_KEY);
+            if (ls) data = JSON.parse(ls);
+        }
+        return data;
+    },
+
+    // FUNÇÃO REINTRODUZIDA PARA CORRIGIR O ERRO "this.updateSyncStatus is not a function"
+    updateSyncStatus(isOnline) {
+        const el = document.getElementById('sync-indicator');
+        if(el) {
+            el.className = `sync-status ${isOnline ? 'sync-online' : 'sync-offline'}`;
+            el.title = isOnline ? 'Sincronizado (Nuvem)' : 'Modo Offline (Local)';
+        }
+    }
+};
+
+async function saveData() {
+    await DataManager.save(appData);
+}
+
+if (typeof firebase !== 'undefined' && firebaseConfig.apiKey && firebaseConfig.apiKey !== "SUA_API_KEY_AQUI") {
+    try { 
+        firebase.initializeApp(firebaseConfig); 
+        console.log("Firebase Inicializado");
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) console.log("Firebase Auth: OK");
+        });
+    } catch(e) { console.error("Erro Fatal Firebase Init", e); }
+}
+
+let appData = { currentUser: null, users: [], records: {}, irrfTable: [] };
+let checkInterval = null; 
+
+const DEFAULT_IRRF = [
+    { id: 'irrf_1', max: 2259.20, rate: 0, deduction: 0 },
+    { id: 'irrf_2', max: 2826.65, rate: 7.5, deduction: 169.44 },
+    { id: 'irrf_3', max: 3751.05, rate: 15, deduction: 381.44 },
+    { id: 'irrf_4', max: 4664.68, rate: 22.5, deduction: 662.77 },
+    { id: 'irrf_5', max: 99999999, rate: 27.5, deduction: 896.00 }
+];
+
+let currentCrudType = 'products'; 
+let currentListingType = 'clients';
+let currentFinanceFilter = 'all';
+let currentView = 'dashboard';
+
+// --- FUNÇÃO AUXILIAR DE ENVIO AUTOMÁTICO (CLOUD FUNCTIONS) ---
+async function sendAutoEmail(to_email, subject, message, attachment_data = null, attachment_name = null) {
+    if (!navigator.onLine) {
+        return Promise.reject("Sem conexão com a internet.");
+    }
+
+    try {
+        const payload = {
+            to: to_email,          
+            email: to_email,       
+            subject: subject,
+            text: message,         
+            html: message.replace(/\n/g, '<br>'), 
+            attachment: attachment_data, 
+            filename: attachment_name
+        };
+
+        // Debug para verificar o que está sendo enviado
+        console.log("Payload enviado para Cloud Function:", payload);
+
+        const response = await fetch(CLOUD_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro no servidor: ${response.status} ${response.statusText}`);
+        }
+
+        return true;
+
+    } catch (error) {
+        console.warn("Falha ao chamar Cloud Function:", error);
+        throw error; 
+    }
+}
+
+async function init() {
+    try {
+        const loadedData = await DataManager.load();
+        if (loadedData) appData = loadedData;
+        
+        if (!appData.irrfTable || appData.irrfTable.length === 0) appData.irrfTable = JSON.parse(JSON.stringify(DEFAULT_IRRF));
+        
+        const sessionUser = sessionStorage.getItem('mei_user_id');
+        
+        setTimeout(() => {
+            if (sessionUser) {
+                const user = appData.users.find(u => u.id === sessionUser);
+                if (user) { 
+                    loginUser(user); 
+                } else {
+                    showAuth();
+                }
+            } else {
+                showAuth();
+            }
+            const loader = document.getElementById('loading-overlay');
+            if(loader) loader.style.display = 'none';
+        }, 500);
+    } catch(err) {
+        console.error("Erro crítico na inicialização:", err);
+        document.getElementById('loading-overlay').style.display = 'none';
+        document.getElementById('auth-screen').classList.remove('hidden');
+    }
+}
+
+function showAuth() { 
+    document.getElementById('auth-screen').classList.remove('hidden'); 
+    document.getElementById('app-container').classList.add('hidden'); 
+}
+
+async function loginUser(user) {
+    const authScreen = document.getElementById('auth-screen');
+    authScreen.classList.add('hidden');
+    authScreen.style.display = 'none'; 
+
+    document.getElementById('app-container').classList.remove('hidden');
     
     try {
-        await db.collection("users").doc(currentUser.uid).update({
-            diagnosisData: data
-        });
-        if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot"></span> Firebase Conectado`;
+        const cloudData = await DataManager.pullCloudData(user.id);
+        if (cloudData) {
+            appData = cloudData;
+            const updatedUser = appData.users.find(u => u.id === user.id);
+            if (updatedUser) user = updatedUser;
+            DataManager.updateSyncStatus(true);
+        }
+    } catch(e) { console.log("Login Offline (Cloud falhou ou sem net)"); }
+
+    appData.currentUser = user; 
+    sessionStorage.setItem('mei_user_id', user.id);
+    
+    document.getElementById('user-name-display').innerText = user.name;
+    
+    if(!appData.records[user.id]) appData.records[user.id] = createSeedData();
+    if(!appData.records[user.id].appointments) appData.records[user.id].appointments = [];
+    if(!appData.records[user.id].reminders) appData.records[user.id].reminders = []; 
+    
+    checkLicense(); 
+    navTo('dashboard'); 
+    loadFiscalReminders();
+    initReminderSystem(); 
+    saveData(); 
+}
+
+async function manualSync() {
+    if (!appData.currentUser) return;
+    
+    const btn = document.querySelector('.btn-sync');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Conectando...';
+    btn.disabled = true;
+
+    try {
+        if (!navigator.onLine) throw new Error("Sem conexão com a internet.");
+        
+        if (!firebase.auth().currentUser) {
+             throw new Error("Sessão Firebase expirada. Faça Logout e Login novamente com Google.");
+        }
+
+        const cloudData = await DataManager.pullCloudData(appData.currentUser.id);
+        if (cloudData) {
+            appData = cloudData;
+            const updatedUser = appData.users.find(u => u.id === appData.currentUser.id);
+            if(updatedUser) appData.currentUser = updatedUser;
+        }
+
+        await DataManager.save(appData);
+        alert('Sincronização OK! Dados salvos na nuvem.');
+        navTo(currentView); 
     } catch (e) {
-        console.error("Erro ao salvar", e);
-        if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:red"></span> Erro ao salvar`;
-    }
-}
-
-function loadFormDataFromObject(data) {
-    Object.keys(data).forEach(key => {
-        const fields = document.getElementsByName(key);
-        if (fields.length > 0) {
-            const field = fields[0];
-            if (field.type === "radio") {
-                for(let i=0; i<fields.length; i++) {
-                    if(fields[i].value === data[key]) fields[i].checked = true;
-                }
-            } else if (field.type === "checkbox") {
-                field.checked = true;
-            } else {
-                field.value = data[key];
-            }
-            if(key === 'ads_investe') toggleAdsDetail(data[key]);
-            if(key === 'mktp_vende') toggleMktpDetail(data[key]);
-        }
-    });
-    // Atualiza navegação visualmente
-    showStep(currentStep); 
-}
-
-// --- SISTEMA DE BLOQUEIO E CONTRA-SENHA (REGRA 3 e 4) ---
-function generateRandomCode() {
-    // Regra 3: Número entre 100 e 1000
-    generatedRandomNumber = Math.floor(Math.random() * 901) + 100;
-    const display = document.getElementById('displayRandomCode');
-    display.textContent = generatedRandomNumber;
-    display.style.display = 'block';
-}
-
-async function validateUnlock() {
-    const input = document.getElementById('unlockInput').value.trim();
-    // Regra 4: Formato XXXXX-YYY
-    const parts = input.split('-');
-    
-    if (parts.length !== 2) return alert("Formato inválido. Use XXXXX-YYY.");
-
-    const codeInput = parseInt(parts[0]);
-    const daysInput = parseInt(parts[1]);
-    
-    // Regra 3: Fórmula (R + 13) * 9 + 1954
-    const expectedCode = (generatedRandomNumber + CONST_ADD) * CONST_MULT + CONST_BASE;
-
-    if (codeInput === expectedCode) {
-        const now = new Date();
-        // Adiciona dias à data atual
-        const newExpiration = now.getTime() + (daysInput * 24 * 60 * 60 * 1000);
-        
-        showLoading();
-        try {
-            // Atualiza Firestore
-            await db.collection("users").doc(currentUser.uid).update({
-                "license.expiration": newExpiration,
-                "license.lastAccess": now.getTime()
-            });
-            
-            // Atualiza local
-            currentUser.license.expiration = newExpiration;
-            currentUser.license.lastAccess = now.getTime();
-            
-            hideLoading();
-            alert(`Licença renovada no Firebase por ${daysInput} dias!`);
-            
-            document.getElementById('unlockInput').value = "";
-            document.getElementById('displayRandomCode').style.display = 'none';
-            
-            proceedToApp();
-        } catch(e) {
-            console.error(e);
-            hideLoading();
-            alert("Erro ao atualizar licença no banco de dados.");
-        }
-    } else {
-        alert("Contra-senha inválida.");
-    }
-}
-
-function openLockScreenForRenewal() {
-    closeSettings();
-    appContainer.style.display = 'none';
-    document.querySelector('.nav-buttons').style.display = 'none';
-    document.querySelector('header').style.display = 'none';
-    lockScreen.style.display = 'flex';
-}
-
-// --- UI HELPERS ---
-let currentStep = 0;
-const steps = document.querySelectorAll(".step");
-
-function showStep(n) {
-    steps.forEach((step, index) => {
-        step.classList.remove("active");
-        step.style.display = "none"; // Garante ocultação
-        if (index === n) {
-            step.classList.add("active");
-            step.style.display = "block";
-        }
-    });
-    
-    document.getElementById("prevBtn").style.visibility = n === 0 ? "hidden" : "visible";
-    
-    if (n === steps.length - 1) {
-        document.getElementById("nextBtn").style.display = "none";
-        document.getElementById("submitBtn").style.display = "inline-block";
-    } else {
-        document.getElementById("nextBtn").style.display = "inline-block";
-        document.getElementById("nextBtn").innerHTML = "Próximo";
-        document.getElementById("submitBtn").style.display = "none";
-    }
-    const progressBar = document.getElementById("progressBar");
-    if(progressBar) progressBar.style.width = ((n + 1) / steps.length) * 100 + "%";
-    window.scrollTo(0, 0);
-}
-
-function nextPrev(n) {
-    if (n === 1 && !validateForm()) return false;
-    
-    // Oculta step atual
-    steps[currentStep].style.display = "none";
-    currentStep += n;
-    
-    if (currentStep >= steps.length) {
-        generateReport();
-        return false;
-    }
-    showStep(currentStep);
-}
-
-function validateForm() {
-    let valid = true;
-    const currentInputs = steps[currentStep].querySelectorAll("input[required], select[required], textarea[required]");
-    currentInputs.forEach(input => {
-        if (input.value.trim() === "") {
-            input.style.borderColor = "#ff6b6b";
-            valid = false;
+        console.error(e);
+        if (e.code === 'unavailable') {
+            alert("Firebase offline ou bloqueado pela rede.");
+        } else if (e.code === 'permission-denied') {
+            alert("Erro de Permissão: Verifique as regras do Firestore e se o domínio está autorizado.");
         } else {
-            input.style.borderColor = "#ccc";
+            alert('Erro: ' + e.message);
+        }
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+function logout() { 
+    if(checkInterval) clearInterval(checkInterval); 
+    if (typeof firebase !== 'undefined') firebase.auth().signOut();
+    appData.currentUser = null; 
+    sessionStorage.removeItem('mei_user_id'); 
+    location.reload(); 
+}
+
+function toggleAuth(screen) {
+    document.getElementById('login-form').classList.toggle('hidden', screen === 'register');
+    document.getElementById('register-form').classList.toggle('hidden', screen !== 'register');
+}
+
+function handleGoogleLogin() {
+    console.log("Tentando login Google em: " + window.location.hostname);
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(provider).then(async (result) => {
+        const user = result.user;
+        const cloudData = await DataManager.pullCloudData('u_' + user.uid);
+        if (cloudData) appData = cloudData;
+
+        let appUser = appData.users.find(u => u.email === user.email);
+        if(!appUser) {
+            appUser = {
+                id: 'u_' + user.uid, 
+                name: user.displayName, 
+                email: user.email, 
+                password: 'google_auth', 
+                licenseExpire: new Date().getTime() + (30 * 86400000), // 30 dias
+                company: { reserve_rate: 10, prolabore_target: 4000 }
+            };
+            appData.users.push(appUser);
+            appData.records[appUser.id] = createSeedData();
+        }
+        loginUser(appUser);
+    }).catch((error) => {
+        console.error("Erro Google Auth:", error);
+        if (error.code === 'auth/unauthorized-domain') {
+            alert("ERRO CRÍTICO: DOMÍNIO NÃO AUTORIZADO NO FIREBASE.");
+        } else if (error.code === 'auth/popup-closed-by-user') {
+            alert("Login cancelado pelo usuário.");
+        } else {
+            alert("Erro no Login: " + error.message);
         }
     });
-    if (!valid) alert("Preencha os campos obrigatórios marcados.");
-    return valid;
 }
 
-function updateDaysBadge() {
-    if (!currentUser) return;
-    const now = Date.now();
-    const diff = currentUser.license.expiration - now;
-    const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    document.getElementById('daysBadge').textContent = daysLeft > 0 ? `${daysLeft}d` : '0d';
+function createSeedData() {
+    const today = new Date().toISOString().split('T')[0];
+    return { 
+        products: [{id: 'p_ex', name: 'Produto Exemplo A', price: 100.00, description: 'Produto para teste'}], 
+        services: [{id: 's_ex', name: 'Serviço Exemplo B', price: 200.00, description: 'Serviço para teste'}], 
+        clients: [{id: 'c_ex', name: 'Cliente Teste', phone: '(11) 99999-9999', address: 'Rua Exemplo, 100', cnpj_cpf: '000.000.000-00', contact_person: 'João', email: 'cliente@teste.com'}], 
+        suppliers: [{id: 'f_ex', name: 'Fornecedor Teste', phone: '(11) 88888-8888', address: 'Av Exemplo, 200', cnpj_cpf: '00.000.000/0001-00', contact_person: 'Maria', email: 'fornecedor@teste.com'}], 
+        transactions: [
+            {id: 't_ex1', type: 'receita', category: 'Venda de produto', value: 150.00, date: today, obs: 'Venda inicial de teste', entity: 'Cliente Teste'},
+            {id: 't_ex2', type: 'despesa', category: 'Despesas Operacionais', value: 50.00, date: today, obs: 'Despesa inicial de teste', entity: 'Fornecedor Teste'}
+        ], 
+        rpas: [],
+        appointments: [],
+        reminders: []
+    };
 }
 
-function openSettings() {
-    const modal = document.getElementById('settingsModal');
-    const now = Date.now();
-    const exp = currentUser.license.expiration;
-    const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+// CORREÇÃO: Cadastro agora é async, cria usuário no Firebase Auth e salva na nuvem/local
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    const name = document.getElementById('reg-name').value;
+
+    // Verificação local rápida (mas o Firebase também checará)
+    if (appData.users.find(u => u.email === email)) return alert('E-mail já existe (Local)!');
     
-    document.getElementById('settingsUser').textContent = currentUser.name;
-    document.getElementById('settingsStatus').textContent = daysLeft > 0 ? "Ativo (Firebase)" : "Expirado";
-    document.getElementById('settingsDate').textContent = new Date(exp).toLocaleDateString();
-    document.getElementById('settingsDaysLeft').textContent = daysLeft;
-    modal.style.display = 'flex';
+    try {
+        // 1. Criação no Firebase Auth (Painel de Autenticação)
+        let firebaseUid = null;
+        if (typeof firebase !== 'undefined' && navigator.onLine) {
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            await user.updateProfile({ displayName: name });
+            firebaseUid = user.uid;
+        } else {
+            // Fallback para ID manual se offline (embora registro offline não autentique no Firebase)
+            firebaseUid = Date.now().toString(); 
+        }
+
+        // 2. Criação do objeto de usuário seguindo a estrutura existente
+        const newUser = {
+            id: 'u_' + firebaseUid, // Mantém padrão do Google Login
+            name: name, 
+            email: email,
+            password: password, // Mantém para login local/offline (lógica existente)
+            licenseExpire: new Date().getTime() + (30 * 86400000), // 30 dias
+            company: { reserve_rate: 10, prolabore_target: 4000 }
+        };
+
+        // Atualiza estado local
+        appData.users.push(newUser); 
+        appData.records[newUser.id] = createSeedData();
+
+        // Define o usuário atual IMEDIATAMENTE
+        appData.currentUser = newUser;
+
+        // Persistência Explícita no Firestore (Banco de Dados)
+        if (typeof firebase !== 'undefined' && navigator.onLine) {
+            const db = firebase.firestore();
+            const userDataToSave = JSON.parse(JSON.stringify(appData));
+            await db.collection('users').doc(newUser.id).set(userDataToSave);
+            console.log("Novo usuário salvo no Firebase com sucesso.");
+        }
+
+        // Fluxo normal segue (saveData local + Login)
+        saveData().then(() => loginUser(newUser));
+
+    } catch (err) {
+        console.error("Erro no cadastro:", err);
+        alert("Erro ao criar conta: " + err.message);
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const user = appData.users.find(u => u.email === document.getElementById('login-email').value && u.password === document.getElementById('login-password').value);
+    user ? loginUser(user) : alert('Usuário não encontrado ou senha incorreta (Verifique se criou a conta neste dispositivo).');
+});
+
+function navTo(viewId) {
+    currentView = viewId;
+    document.querySelectorAll('main section').forEach(el => el.classList.add('hidden'));
+    const target = document.getElementById('view-' + viewId);
+    if(target) target.classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => {
+        if(el.getAttribute('onclick') && el.getAttribute('onclick').includes(viewId)) {
+            el.classList.add('active');
+        }
+    });
+    
+    if(viewId === 'dashboard') updateDashboard();
+    if(viewId === 'listagens') switchListing('clients');
+    if(viewId === 'financeiro') renderTransactions();
+    if(viewId === 'cadastros') renderCrud(currentCrudType);
+    if(viewId === 'agenda') renderAgenda(); 
+    if(viewId === 'fiscal') {
+        renderIrrf();
+        const comp = appData.currentUser.company || {};
+        document.getElementById('link-emissor').href = comp.url_fiscal || DEFAULT_URL_FISCAL;
+        document.getElementById('link-das').href = comp.url_das || DEFAULT_URL_DAS;
+    }
+    if(viewId === 'configuracoes') {
+        loadSettings();
+        // FIX: Normaliza e-mail para minúsculas para evitar erro de Case Sensitivity no GitHub Pages
+        const userEmail = appData.currentUser && appData.currentUser.email ? appData.currentUser.email.toLowerCase() : '';
+        // Verifica se o email normalizado está na lista de admins
+        if(ADMIN_EMAILS.includes(userEmail)) {
+            document.getElementById('admin-panel').classList.remove('hidden');
+        } else {
+            document.getElementById('admin-panel').classList.add('hidden');
+        }
+    }
+    if(viewId === 'lembretes') renderRemindersList();
+    if(viewId === 'rpa') loadRPAOptions();
 }
 
-function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+function loadSettings() {
+    const c = appData.currentUser.company || {};
+    document.getElementById('conf-company-name').value = c.name||''; 
+    document.getElementById('conf-cnpj').value = c.cnpj||''; 
+    document.getElementById('conf-address').value = c.address||''; 
+    document.getElementById('conf-phone').value = c.phone||''; 
+    document.getElementById('conf-whatsapp').value = c.whatsapp||'';
+    document.getElementById('conf-auth-email').value = c.auth_email || ''; 
+    document.getElementById('conf-url-fiscal').value = c.url_fiscal || DEFAULT_URL_FISCAL;
+    document.getElementById('conf-url-das').value = c.url_das || DEFAULT_URL_DAS;
+    document.getElementById('conf-reserve-rate').value = c.reserve_rate || 10;
+    document.getElementById('conf-prolabore-target').value = c.prolabore_target || 4000;
+}
 
-function toggleAdsDetail(val) { document.getElementById('adsDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
-function toggleMktpDetail(val) { document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
+function saveCompanyData(e) {
+    e.preventDefault();
+    try {
+        const companyData = {
+            name: document.getElementById('conf-company-name').value,
+            cnpj: document.getElementById('conf-cnpj').value,
+            address: document.getElementById('conf-address').value,
+            phone: document.getElementById('conf-phone').value,
+            whatsapp: document.getElementById('conf-whatsapp').value,
+            role: document.getElementById('conf-role').value,
+            auth_email: document.getElementById('conf-auth-email').value, 
+            url_fiscal: document.getElementById('conf-url-fiscal').value,
+            url_das: document.getElementById('conf-url-das').value,
+            reserve_rate: parseFloat(document.getElementById('conf-reserve-rate').value),
+            prolabore_target: parseFloat(document.getElementById('conf-prolabore-target').value)
+        };
+        appData.currentUser.company = companyData;
+        
+        const supplierId = 'sup_own_' + appData.currentUser.id;
+        const supplierData = {
+            id: supplierId, name: companyData.name + " (Minha Empresa)",
+            cnpj_cpf: companyData.cnpj, phone: companyData.phone,
+            address: companyData.address, email: appData.currentUser.email,
+            contact_person: appData.currentUser.name, is_own_company: true
+        };
+        const userData = getUserData();
+        if(userData) {
+            const suppliersList = userData.suppliers;
+            const supIndex = suppliersList.findIndex(s => s.id === supplierId);
+            if(supIndex >= 0) suppliersList[supIndex] = supplierData; else suppliersList.push(supplierData);
+            saveData(); 
+            alert('Dados salvos!');
+        }
+    } catch(err) { alert('Erro ao salvar empresa: ' + err.message); }
+}
 
-// --- IA / RELATÓRIO / BACKUP ---
-function generateReport() {
-    document.getElementById("diagnosisForm").style.display = "none";
-    document.querySelector('.nav-buttons').style.display = 'none';
-    document.getElementById("reportSection").style.display = "block";
+function updateDashboard() {
+    const userData = getUserData();
+    if (!userData) return;
+    const t = userData.transactions; 
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const reserveRate = appData.currentUser.company.reserve_rate || 10;
+    const prolaboreTarget = appData.currentUser.company.prolabore_target || 4000;
+
+    let income = 0; let expense = 0; let totalReserve = 0; let totalProlabore = 0;
+    t.forEach(x => {
+        const d = new Date(x.date);
+        if (x.type === 'receita') {
+            if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+                income += x.value;
+                const reserveAmount = x.value * (reserveRate / 100);
+                totalReserve += reserveAmount;
+                const remainder = x.value - reserveAmount;
+                const needed = prolaboreTarget - totalProlabore;
+                if (needed > 0) totalProlabore += (remainder >= needed) ? needed : remainder;
+            }
+        } else {
+            if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) expense += x.value;
+        }
+    });
+
+    document.getElementById('dash-income').innerText = `R$ ${income.toFixed(2)}`;
+    document.getElementById('dash-expense').innerText = `R$ ${expense.toFixed(2)}`;
+    document.getElementById('dash-balance').innerText = `R$ ${(income-expense).toFixed(2)}`;
+    document.getElementById('reserve-percent-display').innerText = reserveRate;
+    document.getElementById('dash-reserve').innerText = `R$ ${totalReserve.toFixed(2)}`;
+    document.getElementById('dash-prolabore').innerText = `R$ ${totalProlabore.toFixed(2)}`;
+    document.getElementById('dash-prolabore-target').innerText = `Meta: R$ ${prolaboreTarget.toFixed(2)}`;
+}
+
+function renderAgenda(filter = '') {
+    const userData = getUserData();
+    if (!userData) return;
+    if(!userData.appointments) userData.appointments = [];
+    let list = userData.appointments.sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time));
+
+    if (filter === 'today') {
+        const today = new Date().toISOString().split('T')[0];
+        list = list.filter(a => a.date === today);
+    } else if (!filter) {
+        const inputDate = document.getElementById('agenda-filter-date').value;
+        if(inputDate) list = list.filter(a => a.date === inputDate);
+    }
+
+    const container = document.getElementById('agenda-list');
+    container.innerHTML = '';
+    if (list.length === 0) { container.innerHTML = '<p class="text-center p-4" style="grid-column: 1/-1;">Nenhum agendamento encontrado.</p>'; return; }
+
+    const statusMap = {
+        'agendado': { label: 'Agendado', class: 'bg-scheduled', card: 'status-agendado' },
+        'concluido': { label: 'Concluído', class: 'bg-done', card: 'status-concluido' },
+        'cancelado': { label: 'Cancelado', class: 'bg-canceled', card: 'status-cancelado' }
+    };
+
+    list.forEach(a => {
+        const st = statusMap[a.status] || statusMap['agendado'];
+        const formattedDate = a.date.split('-').reverse().join('/');
+        const card = document.createElement('div');
+        card.className = `stat-card agenda-card ${st.card}`;
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-2">
+                <span class="badge ${st.class}">${st.label}</span>
+                <div class="text-sm font-bold text-light">${formattedDate} - ${a.time}</div>
+            </div>
+            <h3 class="mb-1">${a.title}</h3>
+            <p class="text-sm mb-1"><strong>Cliente:</strong> ${a.client_name}</p>
+            <p class="text-sm mb-2 text-light">${a.service_desc || 'Sem descrição'}</p>
+            <div class="flex justify-between items-center mt-2 border-t pt-2">
+                <div class="text-sm">
+                    <span class="${a.pay_status === 'pago' ? 'text-success font-bold' : 'text-warning'}">
+                        ${a.pay_status === 'pago' ? '💲 Pago' : '⏳ Pendente'}
+                    </span>
+                        - R$ ${parseFloat(a.value).toFixed(2)}
+                </div>
+                <div>
+                    <button class="action-btn btn-warning" onclick="editAppointment('${a.id}')">✏️</button>
+                    <button class="action-btn btn-danger" onclick="deleteAppointment('${a.id}')">🗑️</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function openAppointmentModal(appt = null) {
+    document.getElementById('form-appointment').reset();
+    const clientSelect = document.getElementById('appt-client-select');
+    clientSelect.innerHTML = '<option value="">Selecionar Cliente Cadastrado...</option>';
+    getUserData().clients.forEach(c => { clientSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+
+    if (appt) {
+        document.getElementById('appt-id').value = appt.id;
+        document.getElementById('appt-title').value = appt.title;
+        document.getElementById('appt-date').value = appt.date;
+        document.getElementById('appt-time').value = appt.time;
+        document.getElementById('appt-client-name').value = appt.client_name;
+        document.getElementById('appt-client-phone').value = appt.client_phone;
+        document.getElementById('appt-desc').value = appt.service_desc;
+        document.getElementById('appt-value').value = appt.value;
+        document.getElementById('appt-status').value = appt.status;
+        document.getElementById('appt-pay-method').value = appt.pay_method;
+        document.getElementById('appt-pay-status').value = appt.pay_status;
+        document.getElementById('appt-obs').value = appt.obs;
+    } else {
+        document.getElementById('appt-id').value = '';
+        document.getElementById('appt-date').valueAsDate = new Date();
+        document.getElementById('appt-status').value = 'agendado';
+    }
+    document.getElementById('modal-appointment').classList.remove('hidden');
+}
+
+function fillAppointmentClient() {
+    const id = document.getElementById('appt-client-select').value;
+    if(id) {
+        const c = getUserData().clients.find(x => x.id === id);
+        if(c) {
+            document.getElementById('appt-client-name').value = c.name;
+            document.getElementById('appt-client-phone').value = c.phone || '';
+        }
+    }
+}
+
+function saveAppointment(e) {
+    e.preventDefault();
+    try {
+        const id = document.getElementById('appt-id').value;
+        const data = {
+            id: id || 'appt_' + Date.now(),
+            title: document.getElementById('appt-title').value,
+            date: document.getElementById('appt-date').value,
+            time: document.getElementById('appt-time').value,
+            client_name: document.getElementById('appt-client-name').value,
+            client_phone: document.getElementById('appt-client-phone').value,
+            service_desc: document.getElementById('appt-desc').value,
+            value: document.getElementById('appt-value').value || 0,
+            status: document.getElementById('appt-status').value,
+            pay_method: document.getElementById('appt-pay-method').value,
+            pay_status: document.getElementById('appt-pay-status').value,
+            obs: document.getElementById('appt-obs').value
+        };
+        const list = getUserData().appointments;
+        if (id) { const idx = list.findIndex(x => x.id === id); if(idx !== -1) list[idx] = data; } else { list.push(data); }
+        saveData(); closeModal('modal-appointment'); renderAgenda();
+    } catch(err) { alert('Erro ao salvar agendamento: ' + err.message); }
+}
+
+function editAppointment(id) { const appt = getUserData().appointments.find(a => a.id === id); if(appt) openAppointmentModal(appt); }
+function deleteAppointment(id) { if(confirm('Excluir este agendamento?')) { const list = getUserData().appointments; const idx = list.findIndex(a => a.id === id); if(idx !== -1) list.splice(idx, 1); saveData(); renderAgenda(); } }
+
+function loadRPAOptions() {
+    const comp = appData.currentUser.company || {};
+    document.getElementById('rpa-comp-name').value = comp.name || '';
+    document.getElementById('rpa-comp-cnpj').value = comp.cnpj || '';
+    document.getElementById('rpa-comp-addr').value = comp.address || '';
+    // Usa nome e email do usuário se não houver um prestador selecionado
+    if(!document.getElementById('rpa-prov-name').value) document.getElementById('rpa-prov-name').value = appData.currentUser.name;
+    if(!document.getElementById('rpa-prov-email').value) document.getElementById('rpa-prov-email').value = comp.auth_email || '';
+
+    const select = document.getElementById('rpa-provider-select');
+    select.innerHTML = '<option value="">Selecione um Autônomo...</option>';
+    getUserData().suppliers.forEach(s => select.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+    document.getElementById('rpa-date').valueAsDate = new Date();
+    document.getElementById('rpa-id').value = '';
+}
+
+function fillRPAProvider() {
+    const id = document.getElementById('rpa-provider-select').value;
+    const s = getUserData().suppliers.find(item => item.id === id);
+    if (s) {
+        document.getElementById('rpa-prov-name').value = s.name;
+        document.getElementById('rpa-prov-cpf').value = s.cnpj_cpf || '';
+        document.getElementById('rpa-prov-phone').value = s.phone || '';
+        document.getElementById('rpa-prov-addr').value = s.address || '';
+        document.getElementById('rpa-prov-email').value = s.email || '';
+    }
+}
+
+function calculateRPA() {
+    const value = parseFloat(document.getElementById('rpa-value').value) || 0;
+    const issRate = parseFloat(document.getElementById('rpa-iss-rate').value) || 0;
+    const inss = value * 0.11;
+    document.getElementById('rpa-inss').value = `R$ ${inss.toFixed(2)}`;
+    const iss = value * (issRate / 100);
+    document.getElementById('rpa-iss-val').value = `R$ ${iss.toFixed(2)}`;
     
-    const now = new Date();
-    document.getElementById("reportDate").innerText = now.toLocaleDateString() + " às " + now.toLocaleTimeString();
+    const irrfBase = value - inss;
+    let irrf = 0;
+    const table = appData.irrfTable.sort((a,b) => a.max - b.max);
+    for(let row of table) {
+        if (irrfBase <= row.max) { irrf = (irrfBase * (row.rate / 100)) - row.deduction; break; }
+    }
+    if (irrf < 0) irrf = 0;
+    document.getElementById('rpa-irrf').value = `R$ ${irrf.toFixed(2)}`;
+    document.getElementById('rpa-net').value = `R$ ${(value - inss - iss - irrf).toFixed(2)}`;
+}
+
+function saveRPA() {
+    try {
+        const id = document.getElementById('rpa-id').value;
+        const rpa = {
+            id: id || 'rpa_' + Date.now(),
+            date: document.getElementById('rpa-date').value,
+            provider: document.getElementById('rpa-prov-name').value,
+            desc: document.getElementById('rpa-desc').value,
+            value: document.getElementById('rpa-value').value,
+            net: document.getElementById('rpa-net').value,
+            fullData: {
+                provName: document.getElementById('rpa-prov-name').value, provCpf: document.getElementById('rpa-prov-cpf').value,
+                provPhone: document.getElementById('rpa-prov-phone').value, provAddr: document.getElementById('rpa-prov-addr').value,
+                provEmail: document.getElementById('rpa-prov-email').value,
+                inss: document.getElementById('rpa-inss').value, iss: document.getElementById('rpa-iss-val').value, irrf: document.getElementById('rpa-irrf').value
+            }
+        };
+        const list = getUserData().rpas || (getUserData().rpas = []);
+        if(id) { const idx = list.findIndex(r => r.id === id); if(idx !== -1) list[idx] = rpa; else list.push(rpa); } else { list.push(rpa); }
+        saveData(); alert('RPA Salvo!'); toggleRPAHistory();
+    } catch(err) { alert('Erro ao salvar RPA: ' + err.message); }
+}
+
+function sendRPAEmail() {
+    const email = document.getElementById('rpa-prov-email').value;
+    if(!email) return alert('Por favor, preencha o e-mail do autônomo.');
     
-    // Renderiza relatório simples
-    let html = "";
-    steps.forEach((step) => {
-        const title = step.querySelector('.step-header h2').innerText;
-        html += `<div class="report-block"><h3>${title}</h3>`;
-        // Logica de extração de inputs igual ao original
-        const inputs = step.querySelectorAll("input, select, textarea");
-        let processedNames = [];
-        inputs.forEach(input => {
-            if (input.type === "submit" || input.type === "button") return;
-            if (input.closest('#adsDetails') && input.closest('#adsDetails').style.display === 'none') return;
-            if (input.closest('#mktpDetails') && input.closest('#mktpDetails').style.display === 'none') return;
+    const compName = document.getElementById('rpa-comp-name').value || "Empresa";
+    const desc = document.getElementById('rpa-desc').value;
+    const val = document.getElementById('rpa-net').value;
+    const date = document.getElementById('rpa-date').value.split('-').reverse().join('/');
+    const subject = `Recibo RPA - ${compName}`;
+    const body = `Olá,\n\nSegue em anexo o RPA emitido.\n\nServiço: ${desc}\nData: ${date}\nValor Líquido: ${val}\n\nAtt,\n${compName}`;
 
-            if(processedNames.includes(input.name)) return;
-            
-            let val = input.value;
-            let labelText = input.name; // Fallback
+    // --- GERAÇÃO DO ANEXO ---
+    const htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><title>RPA</title></head><body><h2 style="text-align:center">RPA - ${compName}</h2><br><h3>1. Contratante</h3><p>Razão: ${compName}</p><p>CNPJ: ${document.getElementById('rpa-comp-cnpj').value}</p><hr><h3>2. Autônomo</h3><p>Nome: ${document.getElementById('rpa-prov-name').value}</p><p>CPF: ${document.getElementById('rpa-prov-cpf').value}</p><hr><h3>3. Serviço</h3><p>${document.getElementById('rpa-desc').value}</p><p>Data: ${document.getElementById('rpa-date').value}</p><hr><h3>4. Valores</h3><p>Bruto: R$ ${document.getElementById('rpa-value').value}</p><p>Líquido: ${document.getElementById('rpa-net').value}</p></body></html>`;
+    
+    const base64Attachment = btoa(unescape(encodeURIComponent(htmlContent)));
+    const fileName = `RPA_${compName.replace(/[^a-zA-Z0-9]/g, '_')}.doc`;
 
-            // Tenta pegar label
-            if (input.closest('.form-group')) {
-                const label = input.closest('.form-group').querySelector('label');
-                if(label) labelText = label.innerText.split('?')[0].replace('*','').trim();
-            }
-
-            if(input.type === "radio") {
-                const checked = step.querySelector(`input[name="${input.name}"]:checked`);
-                val = checked ? checked.value : "Não informado";
-            } else if (input.tagName === "SELECT") {
-                 val = input.options[input.selectedIndex].text;
-            }
-
-            if(val) {
-                 html += `<div class="report-item"><strong>${labelText}</strong><span>${val}</span></div>`;
-                 processedNames.push(input.name);
-            }
+    sendAutoEmail(email, subject, body, base64Attachment, fileName)
+        .then(() => console.log("E-mail do RPA enviado automaticamente com sucesso (Anexo incluído)!"))
+        .catch((err) => {
+            console.warn("Falha no envio automático, abrindo cliente de email.", err);
+            window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         });
-        html += `</div>`;
+}
+
+function toggleRPAHistory() {
+    const container = document.getElementById('rpa-history-container');
+    container.classList.toggle('hidden');
+    if(!container.classList.contains('hidden')) {
+        const tbody = document.querySelector('#rpa-history-table tbody');
+        tbody.innerHTML = '';
+        const list = getUserData().rpas || [];
+        list.sort((a,b) => new Date(b.date) - new Date(a.date));
+        list.forEach(r => {
+            tbody.innerHTML += `<tr><td>${r.date}</td><td>${r.provider}</td><td>${r.net}</td><td><button class="action-btn btn-warning" onclick="loadRPA('${r.id}')">✏️</button><button class="action-btn btn-danger" onclick="deleteRPA('${r.id}')">🗑️</button></td></tr>`;
+        });
+    }
+}
+
+function loadRPA(id) {
+    const r = getUserData().rpas.find(x => x.id === id);
+    if(r) {
+        document.getElementById('rpa-id').value = r.id; document.getElementById('rpa-date').value = r.date;
+        document.getElementById('rpa-desc').value = r.desc; document.getElementById('rpa-value').value = r.value;
+        document.getElementById('rpa-prov-name').value = r.fullData.provName; document.getElementById('rpa-prov-cpf').value = r.fullData.provCpf;
+        document.getElementById('rpa-prov-phone').value = r.fullData.provPhone; document.getElementById('rpa-prov-addr').value = r.fullData.provAddr;
+        document.getElementById('rpa-prov-email').value = r.fullData.provEmail || '';
+        calculateRPA(); alert('RPA Carregado.'); window.scrollTo(0,0);
+    }
+}
+
+function deleteRPA(id) { if(confirm('Excluir este RPA?')) { const l = getUserData().rpas; l.splice(l.findIndex(r => r.id === id), 1); saveData(); toggleRPAHistory(); } }
+
+function exportRPAPdf() { 
+    const originalTitle = document.title;
+    const compName = document.getElementById('rpa-comp-name').value || "Empresa";
+    const cleanName = compName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+    document.title = `RPA_${cleanName}`;
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active-print')); 
+    document.getElementById('view-rpa').classList.add('active-print'); 
+    window.print();
+    setTimeout(() => { document.title = originalTitle; }, 1000);
+}
+
+function exportRPADoc() { 
+    const compName = document.getElementById('rpa-comp-name').value || "Empresa";
+    const cleanName = compName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><title>RPA</title></head><body><h2 style="text-align:center">RPA - ${compName}</h2><br><h3>1. Contratante</h3><p>Razão: ${compName}</p><p>CNPJ: ${document.getElementById('rpa-comp-cnpj').value}</p><hr><h3>2. Autônomo</h3><p>Nome: ${document.getElementById('rpa-prov-name').value}</p><p>CPF: ${document.getElementById('rpa-prov-cpf').value}</p><hr><h3>3. Serviço</h3><p>${document.getElementById('rpa-desc').value}</p><p>Data: ${document.getElementById('rpa-date').value}</p><hr><h3>4. Valores</h3><p>Bruto: R$ ${document.getElementById('rpa-value').value}</p><p>Líquido: ${document.getElementById('rpa-net').value}</p></body></html>`; 
+    const blob = new Blob([html], { type: 'application/msword' }); 
+    const url = URL.createObjectURL(blob); 
+    const a = document.createElement('a'); 
+    a.href = url; 
+    a.download = `RPA_${cleanName}.doc`; 
+    a.click(); 
+}
+
+function exportReportPDF() { document.getElementById('report-company-header').innerText = appData.currentUser.company.name || "Minha Empresa"; document.querySelectorAll('section').forEach(s => s.classList.remove('active-print')); document.getElementById('view-listagens').classList.add('active-print'); window.print(); }
+function exportReportDoc() { const header = `<h2>${appData.currentUser.company.name || "Minha Empresa"}</h2>`; const table = document.getElementById('listing-table').outerHTML; const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><title>Relatório</title></head><body>${header}<h3>Relatório do Sistema</h3>${table}</body></html>`; const blob = new Blob([html], { type: 'application/msword' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Relatorio.doc`; a.click(); }
+
+function renderCrud(type) { 
+    currentCrudType = type; 
+    document.getElementById('crud-title').innerText = type.toUpperCase(); 
+    document.querySelectorAll('.crud-btn').forEach(btn => { btn.classList.toggle('active', btn.getAttribute('onclick').includes(`'${type}'`)); });
+    const userData = getUserData();
+    if (!userData) return;
+    const list = userData[type]; 
+    const table = document.getElementById('crud-table'); 
+    let h = type.match(/products|services/) ? '<th>Nome</th><th>Desc</th><th>Preço</th>' : '<th>Nome</th><th>Contato</th><th>Info</th>'; 
+    table.innerHTML = `<thead><tr>${h}<th>Ações</th></tr></thead><tbody>` + list.map(i => `<tr><td>${i.name}</td><td>${i.description || i.contact_person || '-'}</td><td>${i.price ? 'R$ '+i.price : i.phone}</td><td><button class="action-btn btn-warning" onclick="editCrudItem('${i.id}')">✏️</button> <button class="action-btn btn-danger" onclick="deleteCrudItem('${type}','${i.id}')">🗑️</button></td></tr>`).join('') + `</tbody>`; 
+}
+
+function openCrudModal(isEdit = false, itemData = null) { document.getElementById('modal-crud').classList.remove('hidden'); document.getElementById('crud-id').value = itemData ? itemData.id : ''; const fields = document.getElementById('crud-fields'); if(currentCrudType.match(/products|services/)) { fields.innerHTML = `<label>Nome</label><input name="name" value="${itemData?.name||''}" required><label>Preço</label><input type="number" step="0.01" name="price" value="${itemData?.price||''}" required><label>Descrição</label><textarea name="description" rows="3">${itemData?.description||''}</textarea>`; } else { fields.innerHTML = `<label>Nome/Razão</label><input name="name" value="${itemData?.name||''}" required><label>Contato</label><input name="contact_person" value="${itemData?.contact_person||''}"><label>CPF/CNPJ</label><input name="cnpj_cpf" value="${itemData?.cnpj_cpf||''}"><label>Endereço</label><input name="address" value="${itemData?.address||''}"><label>Telefone</label><input name="phone" value="${itemData?.phone||''}"><label>Email</label><input name="email" value="${itemData?.email||''}">`; } }
+function editCrudItem(id) { const item = getUserData()[currentCrudType].find(i => i.id === id); if (item) openCrudModal(true, item); }
+
+function saveCrudItem(e) {
+    e.preventDefault();
+    try {
+        const id = document.getElementById('crud-id').value;
+        const els = e.target.elements;
+        
+        const item = {
+            id: id || 'i_'+Date.now(),
+            name: els['name'] ? els['name'].value : '',
+            price: els['price'] ? els['price'].value : undefined,
+            description: els['description'] ? els['description'].value : undefined,
+            contact_person: els['contact_person'] ? els['contact_person'].value : undefined,
+            phone: els['phone'] ? els['phone'].value : undefined,
+            address: els['address'] ? els['address'].value : undefined,
+            cnpj_cpf: els['cnpj_cpf'] ? els['cnpj_cpf'].value : undefined,
+            email: els['email'] ? els['email'].value : undefined
+        };
+        
+        const userData = getUserData();
+        if(!userData) throw new Error("Usuário não carregado");
+        
+        const list = userData[currentCrudType];
+        const idx = list.findIndex(i => i.id === id);
+        if(idx !== -1) list[idx] = item; else list.push(item);
+        
+        saveData();
+        closeModal('modal-crud');
+        renderCrud(currentCrudType);
+    } catch(err) {
+        alert("Erro ao salvar item: " + err.message);
+    }
+}
+
+function deleteCrudItem(t,id){ if(confirm('Apagar?')){const l=getUserData()[t]; l.splice(l.findIndex(x=>x.id===id),1); saveData(); renderCrud(t);} }
+function getUserData() { 
+    if (!appData.currentUser) return null;
+    return appData.records[appData.currentUser.id]; 
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function checkLicense() { const d = Math.ceil((appData.currentUser.licenseExpire - Date.now())/86400000); document.getElementById('license-days-display').innerText = d>0?d+' dias':'Expirado'; document.getElementById('license-warning').classList.toggle('hidden', d>0); }
+
+function filterFinance(filter) {
+    currentFinanceFilter = filter;
+    document.querySelectorAll('.fin-filter-btn').forEach(btn => { btn.classList.toggle('active', btn.getAttribute('onclick').includes(`'${filter}'`)); });
+    renderTransactions();
+}
+
+function renderTransactions(){ 
+    const userData = getUserData();
+    if (!userData) return;
+    let l = userData.transactions.sort((a,b)=>new Date(b.date)-new Date(a.date)); 
+    if (currentFinanceFilter !== 'all') { l = l.filter(t => t.type === currentFinanceFilter); }
+    document.querySelector('#finance-table tbody').innerHTML = l.length > 0 ? 
+        l.map(t=>`<tr><td>${t.date}</td><td>${t.type}</td><td>${t.category}</td><td>${t.obs||'-'}</td><td>R$ ${t.value}</td><td><button onclick="editTransaction('${t.id}')">✏️</button><button onclick="deleteTransaction('${t.id}')">🗑️</button></td></tr>`).join('') :
+        '<tr><td colspan="6" class="text-center p-4">Nenhuma movimentação encontrada.</td></tr>';
+}
+
+function editTransaction(id){ 
+    const t=getUserData().transactions.find(x=>x.id===id); 
+    document.getElementById('trans-id').value=t.id; 
+    document.getElementById('trans-type').value=t.type; 
+    updateTransactionDependencies(); 
+    document.getElementById('trans-category').value=t.category; 
+    document.getElementById('trans-entity').value=t.entity;
+    document.getElementById('trans-value').value=t.value; 
+    document.getElementById('trans-date').value=t.date; 
+    document.getElementById('trans-obs').value=t.obs; 
+    document.getElementById('modal-transaction').classList.remove('hidden'); 
+}
+
+function saveTransaction(e){ 
+    e.preventDefault(); 
+    try {
+        const id=document.getElementById('trans-id').value; 
+        const t={
+            id:id||'t_'+Date.now(), 
+            type:document.getElementById('trans-type').value, 
+            category:document.getElementById('trans-category').value, 
+            value:parseFloat(document.getElementById('trans-value').value), 
+            date:document.getElementById('trans-date').value, 
+            obs:document.getElementById('trans-obs').value, 
+            entity:document.getElementById('trans-entity').value
+        }; 
+        const userData = getUserData();
+        const l=userData.transactions; 
+        const i=l.findIndex(x=>x.id===t.id); 
+        i!==-1?l[i]=t:l.push(t); 
+        saveData(); closeModal('modal-transaction'); renderTransactions(); 
+    } catch(err) { alert("Erro ao salvar transação: " + err.message); }
+}
+
+function deleteTransaction(id){ if(confirm('Apagar?')){const l=getUserData().transactions; l.splice(l.findIndex(x=>x.id===id),1); saveData(); renderTransactions();} }
+
+function updateTransactionDependencies(){
+    const type = document.getElementById('trans-type').value;
+    const cats = type==='receita'?['Venda','Serviço','Outros']:['Compra','Despesa','Imposto', 'Gastos Pessoais']; 
+    document.getElementById('trans-category').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
+    const select = document.getElementById('trans-entity');
+    const userData = getUserData();
+    if (!userData) return;
+    const list = type === 'receita' ? userData.clients : userData.suppliers;
+    if (list && list.length > 0) { select.innerHTML = '<option value="">Selecione...</option>' + list.map(i => `<option value="${i.name}">${i.name}</option>`).join(''); } 
+    else { select.innerHTML = '<option value="">Sem cadastros disponíveis</option>'; }
+}
+
+function openTransactionModal(){ document.getElementById('form-transaction').reset(); document.getElementById('trans-id').value=''; document.getElementById('modal-transaction').classList.remove('hidden'); updateTransactionDependencies(); }
+
+function switchListing(t){ 
+    currentListingType=t; 
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); if(b.getAttribute('onclick').includes(`'${t}'`)) b.classList.add('active'); });
+    document.getElementById('movements-filter').classList.toggle('hidden', t !== 'movimentacoes');
+    renderListingTable();
+}
+
+function renderListingTable() {
+    const t = currentListingType;
+    const userData = getUserData();
+    if (!userData) return;
+    let data = t === 'movimentacoes' ? userData.transactions : userData[t];
+    
+    if (t === 'movimentacoes') {
+        const monthFilter = document.getElementById('listing-month-filter').value; 
+        if (monthFilter) {
+            data = data.filter(i => i.date.startsWith(monthFilter));
+        }
+        data.sort((a,b) => new Date(b.date) - new Date(a.date));
+    }
+
+    document.getElementById('listing-thead').innerHTML = t === 'movimentacoes' 
+        ? '<tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr>' 
+        : '<tr><th>Nome</th><th>Detalhe</th><th>Valor/Tel</th></tr>'; 
+    
+    document.getElementById('listing-tbody').innerHTML = data.map(i => {
+        if (t === 'movimentacoes') {
+            const colorClass = i.type === 'receita' ? 'text-success' : 'text-danger';
+            return `<tr><td>${i.date}</td><td>${i.type}</td><td>${i.obs || i.category}</td><td class="${colorClass}">${i.value}</td></tr>`;
+        } else {
+            return `<tr><td>${i.name}</td><td>${i.description||i.contact_person||'-'}</td><td>${i.price||i.phone||'-'}</td></tr>`;
+        }
+    }).join('');
+}
+
+function loadFiscalReminders(){ document.getElementById('fiscal-reminders').innerHTML='<li>DAS Dia 20</li>'; }
+function downloadBackup(){ saveData(); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(appData)],{type:'json'})); a.download='backup.json'; a.click(); }
+function restoreBackup(i){ const r=new FileReader(); r.onload=e=>{appData=JSON.parse(e.target.result);saveData();location.reload();}; r.readAsText(i.files[0]); }
+
+function renderIrrf(){ document.getElementById('irrf-table-body').innerHTML=appData.irrfTable.map(r=>`<tr><td>${r.max}</td><td>${r.rate}</td><td>${r.deduction}</td><td><button class="action-btn btn-warning" onclick="editIrrfRow('${r.id}')">✏️</button><button class="action-btn btn-danger" onclick="deleteIrrfRow('${r.id}')">X</button></td></tr>`).join(''); }
+function deleteIrrfRow(id){ appData.irrfTable.splice(appData.irrfTable.findIndex(r=>r.id===id),1); saveData(); renderIrrf(); }
+function openIrrfModal(){ document.getElementById('form-irrf').reset(); document.getElementById('irrf-id').value = ''; document.getElementById('modal-irrf').classList.remove('hidden'); }
+function editIrrfRow(id) {
+    const row = appData.irrfTable.find(r => r.id === id);
+    if(row) {
+        document.getElementById('irrf-id').value = row.id; document.getElementById('irrf-max').value = row.max;
+        document.getElementById('irrf-rate').value = row.rate; document.getElementById('irrf-deduction').value = row.deduction;
+        document.getElementById('modal-irrf').classList.remove('hidden');
+    }
+}
+function saveIrrfRow(e){ 
+    e.preventDefault(); 
+    try {
+        const id = document.getElementById('irrf-id').value;
+        const data = { id: id || 'irrf_'+Date.now(), max:parseFloat(e.target[1].value), rate:parseFloat(e.target[2].value), deduction:parseFloat(e.target[3].value) };
+        if (id) { const idx = appData.irrfTable.findIndex(r => r.id === id); if (idx !== -1) appData.irrfTable[idx] = data; } else { appData.irrfTable.push(data); }
+        saveData(); closeModal('modal-irrf'); renderIrrf(); 
+    } catch(err) { alert(err.message); }
+}
+
+// =========================================================================
+// FUNÇÕES RESTAURADAS & CORREÇÕES PARA GITHUB PAGES
+// =========================================================================
+
+function initReminderSystem() {
+    if(checkInterval) clearInterval(checkInterval);
+    checkInterval = setInterval(checkReminders, 60000); // Checa a cada minuto
+}
+
+function checkReminders() {
+    if(!appData.currentUser) return;
+    const reminders = getUserData().reminders || [];
+    const now = new Date();
+    
+    reminders.forEach(r => {
+        if (!r.nextRun) r.nextRun = r.datetime;
+        const target = new Date(r.nextRun);
+        
+        if (now >= target) {
+            // Atualizar UI do Modal (apenas para fallback ou modo manual)
+            document.getElementById('alert-title').innerText = r.title;
+            document.getElementById('alert-msg').innerText = r.msg;
+            document.getElementById('alert-time').innerText = new Date(r.nextRun).toLocaleString();
+            
+            const mailto = `mailto:${r.email}?subject=${encodeURIComponent(r.title)}&body=${encodeURIComponent(r.msg)}`;
+            document.getElementById('alert-btn-email').href = mailto;
+
+            // LÓGICA DE ENVIO AUTOMÁTICO vs MANUAL
+            if(r.immediate) {
+                // Modo Automático: Tenta enviar silenciosamente
+                sendAutoEmail(r.email, r.title, r.msg)
+                    .then(() => console.log(`Lembrete ${r.title} enviado via API (Silencioso)`))
+                    .catch(e => {
+                        console.error("Falha envio auto lembrete, exibindo modal manual:", e);
+                        // Fallback: Abre o modal se o envio automático falhar
+                        document.getElementById('modal-alert').classList.remove('hidden');
+                    });
+            } else {
+                // Modo Manual: Exibe o modal sempre
+                document.getElementById('modal-alert').classList.remove('hidden');
+            }
+
+            // Atualizar próxima execução
+            const next = new Date(target);
+            switch(r.period) {
+                case 'hourly': next.setHours(next.getHours() + 1); break;
+                case 'daily': next.setDate(next.getDate() + 1); break;
+                case 'weekly': next.setDate(next.getDate() + 7); break;
+                case 'biweekly': next.setDate(next.getDate() + 15); break;
+                case 'monthly': next.setMonth(next.getMonth() + 1); break;
+                case 'yearly': next.setFullYear(next.getFullYear() + 1); break;
+                case 'once': 
+                default:
+                    reminders.splice(reminders.indexOf(r), 1);
+                    saveData();
+                    renderRemindersList();
+                    return; 
+            }
+            r.nextRun = next.toISOString();
+            saveData();
+            renderRemindersList();
+        }
     });
-    document.getElementById("reportContent").innerHTML = html;
 }
 
-// --- NOVA FUNÇÃO DE EDIÇÃO (VOLTA P/ PAGINA 1) ---
-function editForm() {
-    document.getElementById("reportSection").style.display = "none";
-    document.getElementById("diagnosisForm").style.display = "block";
-    document.querySelector('.nav-buttons').style.display = 'flex';
-    
-    // Reseta a visualização para a primeira etapa
-    currentStep = 0;
-    showStep(currentStep);
-    
-    // Se necessário, rola para o topo
-    window.scrollTo(0, 0);
+function renderRemindersList() {
+    const list = getUserData().reminders || [];
+    const tbody = document.getElementById('reminders-tbody');
+    if(!tbody) return;
+    tbody.innerHTML = list.length ? list.map(r => `
+        <tr>
+            <td>${r.title}</td>
+            <td>${new Date(r.nextRun || r.datetime).toLocaleString()}</td>
+            <td>${translatePeriod(r.period)}</td>
+            <td>
+                <button class="action-btn btn-danger" onclick="deleteReminder('${r.id}')">🗑️</button>
+            </td>
+        </tr>
+    `).join('') : '<tr><td colspan="4" class="text-center p-2">Nenhum lembrete configurado.</td></tr>';
 }
 
-// --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
-async function generateAdvice() {
-    showLoading();
-    
-    // Leitura integral dos dados (simulação de processamento)
-    await new Promise(r => setTimeout(r, 1500)); 
-    
-    const data = currentUser.diagnosisData || {};
-    const nomeEmpresa = data.empresa_nome || "Sua Empresa";
-    const segmento = (data.empresa_segmento || "").toLowerCase();
-    const faturamento = parseFloat(data.empresa_faturamento || 0);
-    
-    // Identificadores de contexto
-    const isVarejo = ["varejo", "loja", "comércio", "venda", "produto", "roupas", "moda", "mercado"].some(k => segmento.includes(k));
-    const isB2C = (data.empresa_publico === "B2C" || data.empresa_publico === "Hibrido");
-    
-    const adviceHeader = document.querySelector('#adviceSection h2');
-    adviceHeader.innerText = "Plano de Ação Estratégico (Consultor IA)";
+function translatePeriod(p) {
+    const map = { 'once': 'Uma vez', 'hourly': 'Por Hora', 'daily': 'Diário', 'weekly': 'Semanal', 'biweekly': 'Quinzenal', 'monthly': 'Mensal', 'yearly': 'Anual' };
+    return map[p] || p;
+}
 
-    let html = `<div class="advice-intro">
-        <strong>Análise para: ${nomeEmpresa}</strong><br>
-        Com base na leitura integral do seu diagnóstico, preparamos as seguintes recomendações profissionais, focadas em eficiência e crescimento.
-    </div>`;
+function saveReminder(e) {
+    e.preventDefault();
+    try {
+        const id = document.getElementById('rem-id').value;
+        const rem = {
+            id: id || 'rem_' + Date.now(),
+            title: document.getElementById('rem-title').value,
+            datetime: document.getElementById('rem-datetime').value,
+            period: document.getElementById('rem-period').value,
+            email: document.getElementById('rem-email').value,
+            msg: document.getElementById('rem-msg').value,
+            immediate: document.getElementById('rem-immediate').checked,
+            nextRun: document.getElementById('rem-datetime').value
+        };
 
-    // ---------------------------------------------------------
-    // 1. OTIMIZAÇÃO E CORTE DE CUSTOS (PRIORIDADE 1)
-    // ---------------------------------------------------------
-    let costsAdvice = `<h4>1. Saneamento Financeiro e Redução de Custos</h4>
-    <p style="margin-bottom:10px;">Antes de buscar novas receitas, é crucial estancar vazamentos financeiros.</p>
-    <ul>`;
-    
-    // Assinaturas e Recorrentes
-    costsAdvice += `<li><strong>Auditoria de Assinaturas (SaaS/Serviços):</strong> Revise imediatamente extratos de cartão corporativo. Cancele softwares duplicados ou subutilizados.</li>`;
-    
-    // Telefonia/Internet
-    costsAdvice += `<li><strong>Renegociação de Contratos (Telecom):</strong> Se seus contratos de internet e telefonia têm mais de 12 meses, solicite cotação na concorrência e exija redução na operadora atual. A economia média é de 20%.</li>`;
-    
-    // Eficiência Operacional
-    costsAdvice += `<li><strong>Eficiência Operacional:</strong> Implemente política de "Desperdício Zero". Troque iluminação por LED (se loja física) e instale sensores de presença em áreas comuns.</li>`;
-    
-    // Controle Financeiro Específico
-    if(data.fin_controle !== "Sim") {
-        costsAdvice += `<li><b style="color:#e74c3c">Ação Crítica:</b> Implemente um DRE (Demonstrativo de Resultado) gerencial imediatamente. Sem saber exatamente para onde vai cada centavo, qualquer estratégia de venda é arriscada.</li>`;
-    }
-    
-    // Dívidas
-    if(data.fin_dividas && data.fin_dividas.length > 5) {
-        costsAdvice += `<li><strong>Gestão de Passivos:</strong> Priorize a renegociação das dívidas citadas (${data.fin_dividas.substring(0, 30)}...). Troque dívidas caras (cheque especial/cartão) por crédito com garantia (imóvel/veículo) que possui juros menores.</li>`;
-    }
-    
-    costsAdvice += `</ul>`;
-    html += `<div class="advice-card">${costsAdvice}</div>`;
-
-    // ---------------------------------------------------------
-    // 2. ESTRATÉGIA DIGITAL E POSICIONAMENTO (MERCADO ATUAL)
-    // ---------------------------------------------------------
-    let digitalAdvice = `<h4>2. Estratégia Digital 360º</h4><ul>`;
-
-    // Redes Sociais
-    digitalAdvice += `<li><strong>Instagram e Facebook:</strong> Não utilize apenas como vitrine de fotos estáticas. O algoritmo atual prioriza vídeos curtos (Reels). Humanize a marca mostrando bastidores e "quem faz". A constância sugerida é de 1 post no feed e 5 a 10 stories diários.</li>`;
-    
-    // Google Meu Negócio
-    if(data.seo_gmn !== "Sim") {
-        digitalAdvice += `<li><strong>Google Meu Negócio (Urgente):</strong> Sua empresa precisa aparecer no mapa. É tráfego gratuito e qualificado. Cadastre-se, adicione fotos reais e peça avaliações para os melhores clientes.</li>`;
-    } else {
-        digitalAdvice += `<li><strong>Otimização Google Maps:</strong> Responda a todas as avaliações (boas ou ruins) em até 24h. Adicione fotos novas semanalmente para manter relevância no topo das buscas locais.</li>`;
-    }
-
-    // Site e Landing Pages
-    if(data.site_possui === "Nao") {
-        digitalAdvice += `<li><strong>Landing Pages:</strong> Mesmo sem um site complexo, crie Landing Pages (Páginas de Venda Única) para suas promoções específicas. Isso aumenta a conversão de campanhas pagas drasticamente em comparação a mandar o cliente para o WhatsApp direto.</li>`;
-    } else {
-        digitalAdvice += `<li><strong>Experiência do Site:</strong> Verifique a velocidade de carregamento mobile. Se demorar mais de 3 segundos, você está perdendo até 40% do tráfego pago.</li>`;
-    }
-
-    // Marketplaces
-    if(isVarejo) {
-        if(data.mktp_vende === "Nao") {
-            digitalAdvice += `<li><strong>Diversificação em Marketplaces:</strong> Inicie operação no Mercado Livre ou Shopee. Eles possuem tráfego próprio gigantesco. Use-os como canal de aquisição de cliente (primeira venda) e tente fidelizar para venda direta depois.</li>`;
-        } else {
-            digitalAdvice += `<li><strong>Expansão de Canais:</strong> Se já vende em um marketplace, espelhe o estoque para outros (ex: Amazon, Magalu) usando um ERP integrador (hub), diluindo o risco de bloqueio de conta.</li>`;
-        }
-    }
-
-    // Tráfego Pago vs Orgânico
-    if(data.ads_investe === "Nao") {
-        digitalAdvice += `<li><strong>Tráfego Pago (Ads):</strong> O alcance orgânico está morrendo. Separe uma verba de teste (ex: R$ 300-500) para Google Ads (fundo de funil/quem já busca o produto) ou Meta Ads (geração de desejo).</li>`;
-    } else {
-        digitalAdvice += `<li><strong>Otimização de ROI:</strong> Como já investe, foque em Remarketing (mostrar anúncio para quem visitou o site mas não comprou). É o custo por conversão mais barato disponível.</li>`;
-    }
-    
-    digitalAdvice += `</ul>`;
-    html += `<div class="advice-card">${digitalAdvice}</div>`;
-
-    // ---------------------------------------------------------
-    // 3. SOURCING E IMPORTAÇÃO (SE APLICÁVEL)
-    // ---------------------------------------------------------
-    // Lógica: Sugerir apenas se for comércio/varejo e tiver faturamento relevante ou perfil B2C
-    if(isVarejo && isB2C) {
-        let chinaAdvice = `<h4>3. Estratégia de Suprimentos (Importação)</h4><ul>`;
-        chinaAdvice += `<li><strong>Importação Direta da China:</strong> Dado o seu segmento (${segmento}), existe alta oportunidade de margem na importação direta.</li>`;
+        const userData = getUserData();
+        if(!userData.reminders) userData.reminders = [];
         
-        if(faturamento > 50000) {
-            chinaAdvice += `<li><strong>Importação Simplificada:</strong> Com seu faturamento, avalie utilizar empresas de "Trading" para importar pequenos lotes (até US$ 3.000) via Remessa Expressa para testar novos produtos com marca própria (Private Label) antes de grandes investimentos.</li>`;
+        if(id) {
+            const idx = userData.reminders.findIndex(r => r.id === id);
+            if(idx !== -1) userData.reminders[idx] = rem;
         } else {
-            chinaAdvice += `<li><strong>Sourcing via Alibaba/AliExpress:</strong> Comece validando produtos comprando unitariamente para revenda (dropshipping nacional ou estoque mínimo) para validar a aceitação do público antes de comprar em atacado.</li>`;
+            userData.reminders.push(rem);
+        }
+
+        // Se marcado "Enviar imediatamente" e for novo
+        if (rem.immediate && !id) {
+            sendAutoEmail(rem.email, rem.title, rem.msg)
+                .then(() => console.log("E-mail imediato disparado com sucesso!")) // Alert removido para fluxo silencioso
+                .catch(err => alert("Lembrete salvo, mas erro no envio automático: " + err));
+        }
+
+        saveData();
+        document.querySelector('#view-lembretes form').reset();
+        document.getElementById('rem-id').value = '';
+        renderRemindersList();
+        alert('Lembrete Salvo!');
+    } catch(err) {
+        alert('Erro ao salvar lembrete: ' + err.message);
+    }
+}
+
+function cancelReminderEdit() {
+    document.querySelector('#view-lembretes form').reset();
+    document.getElementById('rem-id').value = '';
+    document.getElementById('rem-btn-cancel').classList.add('hidden');
+    document.getElementById('rem-form-title').innerText = '🔔 Novo Lembrete';
+}
+
+function deleteReminder(id) {
+    if(confirm('Excluir este lembrete?')) {
+        const userData = getUserData();
+        userData.reminders = userData.reminders.filter(r => r.id !== id);
+        saveData();
+        renderRemindersList();
+    }
+}
+
+// --- FUNÇÕES DE ADMINISTRAÇÃO (Corrigidas para Robustez) ---
+
+function openUserManagementModal() {
+    console.log("Tentando abrir modal de gestão de usuários..."); // Log para Debug no GitHub Pages
+
+    if (!appData || !appData.users) {
+        console.error("Erro: appData.users indefinido");
+        alert("Erro ao carregar lista de usuários. Tente sincronizar novamente.");
+        return;
+    }
+
+    const tbody = document.getElementById('usermgmt-tbody');
+    if (!tbody) {
+        console.error("Erro HTML: Elemento usermgmt-tbody não encontrado.");
+        return;
+    }
+
+    tbody.innerHTML = '';
+    
+    appData.users.forEach(u => {
+        // Cálculo seguro de dias restantes
+        let daysLeft = 0;
+        if (u.licenseExpire) {
+            daysLeft = Math.ceil((u.licenseExpire - Date.now()) / 86400000);
         }
         
-        chinaAdvice += `<li><strong>Precificação na Importação:</strong> Lembre-se de calcular o custo nacionalizado (Preço + Frete + Imposto 60% + ICMS) para garantir que a margem final seja superior à compra local.</li>`;
-        chinaAdvice += `</ul>`;
-        html += `<div class="advice-card">${chinaAdvice}</div>`;
+        const statusClass = daysLeft > 0 ? 'text-success' : 'text-danger';
+        const statusText = daysLeft > 0 ? daysLeft + ' dias' : 'Expirado';
+        
+        tbody.innerHTML += `
+            <tr>
+                <td>${u.name || 'Sem nome'}</td>
+                <td>${u.email || '-'}</td>
+                <td class="${statusClass}">${statusText}</td>
+                <td>
+                    <button class="action-btn btn-info" onclick="openCreditsModal('${u.id}')">💎 Créditos</button>
+                    <button class="action-btn btn-danger" onclick="deleteUser('${u.id}')">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    const modal = document.getElementById('modal-usermgmt');
+    if (modal) {
+        modal.classList.remove('hidden');
+        console.log("Modal aberto com sucesso.");
+    } else {
+        console.error("Erro HTML: Modal modal-usermgmt não encontrado.");
     }
-
-    // Atualiza HTML e rola
-    document.getElementById("adviceContent").innerHTML = html;
-    hideLoading();
-    document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
 }
 
-// --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
-function backupData() {
-    if(!currentUser) return;
-    // Cria arquivo JSON com os dados atuais do usuário
-    const backupObj = {
-        userProfile: { name: currentUser.name, email: currentUser.email },
-        diagnosisData: currentUser.diagnosisData
-    };
-    const blob = new Blob([JSON.stringify(backupObj)], {type: "application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "backup_firebase_" + new Date().toISOString().slice(0,10) + ".json";
-    document.body.appendChild(a);
-    a.click();
+function openCreditsModal(userId) {
+    const user = appData.users.find(u => u.id === userId);
+    if (!user) return;
+    
+    document.getElementById('credit-user-id').value = userId;
+    document.getElementById('credit-user-display').innerText = `Usuário: ${user.name} (${user.email})`;
+    document.getElementById('modal-credits').classList.remove('hidden');
 }
 
-function restoreData() { document.getElementById('restoreInput').click(); }
+function toggleCreditMode() {
+    const mode = document.querySelector('input[name="creditType"]:checked').value;
+    document.getElementById('credit-mode-days').classList.toggle('hidden', mode !== 'days');
+    document.getElementById('credit-mode-date').classList.toggle('hidden', mode !== 'date');
+}
 
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const content = JSON.parse(e.target.result);
-            if(content.diagnosisData) {
-                showLoading();
-                // Carrega no form visualmente
-                loadFormDataFromObject(content.diagnosisData);
-                // Salva no Firebase
-                await db.collection("users").doc(currentUser.uid).update({
-                    diagnosisData: content.diagnosisData
-                });
-                // Atualiza objeto local
-                currentUser.diagnosisData = content.diagnosisData;
-                
-                hideLoading();
-                alert("Dados restaurados e sincronizados com Firebase!");
-            } else {
-                alert("Arquivo de backup inválido.");
-            }
-        } catch(err) { 
-            alert("Erro ao ler arquivo: " + err.message); 
+function saveUserCredits() {
+    const userId = document.getElementById('credit-user-id').value;
+    const user = appData.users.find(u => u.id === userId);
+    const mode = document.querySelector('input[name="creditType"]:checked').value;
+    
+    if (user) {
+        if (mode === 'days') {
+            const days = parseInt(document.getElementById('credit-days-input').value);
+            if (!days) return alert("Digite a quantidade de dias.");
+            
+            // Se já expirou, conta a partir de hoje. Se não, soma.
+            const base = user.licenseExpire > Date.now() ? user.licenseExpire : Date.now();
+            user.licenseExpire = base + (days * 86400000);
+        } else {
+            const dateStr = document.getElementById('credit-date-input').value;
+            if (!dateStr) return alert("Selecione uma data.");
+            user.licenseExpire = new Date(dateStr).getTime();
         }
-    };
-    reader.readAsText(file);
-}
-
-async function clearData() { 
-    if(confirm("Deseja limpar todos os dados do formulário no Firebase?")) {
-        form.reset();
-        await saveToFirebase();
-        location.reload(); 
-    } 
-}
-
-async function fillDemoData() {
-    if(!confirm("Isso substituirá os dados atuais por dados de teste completos.")) return;
-
-    // 1. Dados Completos e Realistas de Pequeno Comércio
-    const demoData = {
-        empresa_nome: "Loja Modelo & Estilo",
-        empresa_cnpj: "12.345.678/0001-90",
-        empresa_segmento: "Comércio Varejista de Roupas",
-        empresa_tempo: "5",
-        empresa_funcionarios: "4",
-        empresa_faturamento: "55000.00",
-        empresa_regime: "Simples Nacional",
-        empresa_publico: "B2C",
-        fin_controle: "Parcial",
-        fin_custos_fixos: "15000.00",
-        fin_custos_variaveis: "Taxas de cartão (3.5%), Comissões (3%), Impostos (Simples), Embalagens.",
-        fin_margem: "Nao",
-        fin_ponto_equilibrio: "Nao",
-        fin_dividas: "Empréstimo bancário (parcela de R$ 1.500).",
-        fin_fluxo_caixa: "Nao",
-        prec_metodo: "Multiplico o preço de custo por 2.0 (Markup).",
-        prec_top_vendas: "Camisetas, Calças Jeans, Acessórios.",
-        prec_menor_lucro: "Produtos em promoção ou ponta de estoque.",
-        prec_ticket_medio: "120.00",
-        prec_descontos: "5% para pagamento no PIX ou dinheiro.",
-        atend_canais: "WhatsApp, Instagram e Telefone.",
-        atend_tempo: "Ate 1h",
-        atend_posvenda: "Nao",
-        atend_reclamacoes: "Demora na entrega ou falta de numeração.",
-        vendas_canais_aquisicao: "Instagram, Fachada da loja, Indicação.",
-        vendas_funil: "Mais ou menos",
-        vendas_metas: "Nao",
-        vendas_perdas: "Cliente acha caro ou não tem o tamanho.",
-        promo_frequencia: "Sazonalmente",
-        promo_analise: "Nao",
-        mkt_redes: "Instagram e Facebook.",
-        mkt_frequencia: "2 a 3 vezes por semana.",
-        mkt_converte: "Pouco",
-        seo_gmn: "Sim",
-        seo_conteudo: "Nao",
-        ads_investe: "Sim",
-        ads_plataformas: "Instagram (Botão Turbinar)",
-        ads_valor: "300.00",
-        ads_cpl: "Nao",
-        site_possui: "Nao",
-        site_analytics: "Nao",
-        tec_erp: "Sistema de gestão básico (Bling/Tiny).",
-        tec_crm: "Nao",
-        tec_manual: "Muito",
-        mktp_vende: "Sim",
-        mktp_quais: "Shopee e Mercado Livre (iniciando).",
-        mktp_estoque: "Nao",
-        pp_funcoes: "Parcial",
-        pp_processos: "Nao",
-        pp_gargalos: "Falta de tempo para gestão, faço tudo sozinho(a).",
-        obj_problemas: "Sobra pouco dinheiro no fim do mês, não sei precificar corretamente.",
-        obj_perda_dinheiro: "Estoque parado e taxas de cartão.",
-        obj_principal: "Organizar o financeiro e aumentar o lucro.",
-        obj_metas: "Contratar um gerente e abrir e-commerce.",
-        obj_obs: "Preciso de ajuda urgente com fluxo de caixa."
-    };
-
-    // 2. Itera sobre o objeto e preenche o DOM
-    for (const key in demoData) {
-        const val = demoData[key];
-        const fields = document.getElementsByName(key);
-
-        if (fields.length > 0) {
-            const field = fields[0]; 
-
-            if (field.type === 'radio') {
-                // Radio Buttons
-                const radio = document.querySelector(`input[name="${key}"][value="${val}"]`);
-                if (radio) radio.checked = true;
-            } else {
-                // Text, Number, Select, Textarea
-                field.value = val;
-            }
-        }
+        
+        saveData();
+        alert('Licença atualizada com sucesso!');
+        closeModal('modal-credits');
+        openUserManagementModal(); // Recarrega lista
     }
-
-    // 3. Controla visibilidade de campos condicionais
-    if (typeof toggleAdsDetail === 'function') toggleAdsDetail(demoData.ads_investe);
-    if (typeof toggleMktpDetail === 'function') toggleMktpDetail(demoData.mktp_vende);
-
-    // 4. Salva no Firebase
-    await saveToFirebase();
-    alert("Dados de teste preenchidos com sucesso!");
 }
+
+function deleteUser(userId) {
+    if (userId === appData.currentUser.id) return alert("Você não pode se excluir.");
+    if (confirm("Tem certeza que deseja excluir este usuário e todos os dados dele?")) {
+        appData.users = appData.users.filter(u => u.id !== userId);
+        delete appData.records[userId];
+        saveData();
+        openUserManagementModal();
+    }
+}
+
+init();
