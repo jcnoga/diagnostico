@@ -3,542 +3,813 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor MEI - Sistema Completo V12.13</title>
+    <title>Diagnóstico Empresarial - Firebase Real</title>
     
-    <!-- FIREBASE SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- FIREBASE SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-    <!-- Folha de Estilos -->
-    <link rel="stylesheet" href="style.css?v=12.13">
+    <!-- Link para o arquivo CSS -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- LOADING OVERLAY -->
-    <div id="loading-overlay">
-        <div class="loader"></div>
-        <p>Carregando Gestor MEI...</p>
+    <!-- OVERLAY DE CARREGAMENTO (Cloud Sim) -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
     </div>
 
     <!-- TELA DE AUTENTICAÇÃO -->
-    <div id="auth-screen">
+    <section id="authScreen">
         <div class="auth-card">
-            <h2 class="text-center" style="margin-bottom: 1.5rem;">Gestor MEI</h2>
-            <form id="login-form">
-                <input type="email" id="login-email" placeholder="E-mail" required>
-                <input type="password" id="login-password" placeholder="Senha" required>
-                <button type="submit" class="btn-primary w-full">Entrar</button>
-                <div class="mt-4 flex flex-col gap-2">
-                    <button type="button" class="btn-outline w-full" onclick="toggleAuth('register')">Criar Conta (30 dias grátis)</button>
-                    <!-- Integração Google -->
-                    <button type="button" class="google-btn w-full" onclick="handleGoogleLogin()">Entrar com Google</button>
-                    <a href="#" onclick="alert('Simulação: Link de recuperação enviado para o e-mail!')" class="text-center text-sm text-primary mt-2">Esqueci minha senha</a>
+            
+            <!-- View: Login -->
+            <div id="loginView" class="auth-view active">
+                <h2>Bem-vindo</h2>
+                <p>Faça login com Firebase para acessar o diagnóstico.</p>
+                <form class="auth-form" onsubmit="handleLogin(event)">
+                    <input type="email" id="loginEmail" placeholder="Seu e-mail" required>
+                    <input type="password" id="loginPass" placeholder="Sua senha" required>
+                    <button type="submit" class="auth-btn">Entrar</button>
+                    <!-- Google Auth precisa ser habilitado no console do Firebase -->
+                    <button type="button" class="auth-btn google-btn" onclick="alert('Google Auth precisa ser habilitado no console do Firebase.')">
+                        Entrar com Google
+                    </button>
+                </form>
+                <div class="auth-links">
+                    <a onclick="switchAuthView('forgotView')">Esqueci minha senha</a> |
+                    <a onclick="switchAuthView('registerView')">Cadastrar conta</a>
                 </div>
-            </form>
-            <form id="register-form" class="hidden">
-                <input type="text" id="reg-name" placeholder="Seu Nome Completo" required>
-                <input type="email" id="reg-email" placeholder="E-mail" required>
-                <input type="password" id="reg-password" placeholder="Senha" required>
-                <button type="submit" class="btn-success w-full">Cadastrar e Ganhar 30 Dias</button>
-                <button type="button" class="btn-outline w-full mt-4" onclick="toggleAuth('login')">Voltar para Login</button>
-            </form>
+            </div>
+
+            <!-- View: Cadastro -->
+            <div id="registerView" class="auth-view">
+                <h2>Criar Conta Firebase</h2>
+                <p>Preencha seus dados para começar. Você ganhará 30 dias de acesso gratuito.</p>
+                <form class="auth-form" onsubmit="handleRegister(event)">
+                    <input type="text" id="regName" placeholder="Seu Nome Completo" required>
+                    <input type="email" id="regEmail" placeholder="Seu E-mail" required>
+                    <input type="password" id="regPass" placeholder="Crie uma Senha (mín 6 dígitos)" required>
+                    <button type="submit" class="auth-btn">Cadastrar</button>
+                </form>
+                <div class="auth-links">
+                    <a onclick="switchAuthView('loginView')">Já tenho conta. Fazer Login</a>
+                </div>
+            </div>
+
+            <!-- View: Esqueci Senha -->
+            <div id="forgotView" class="auth-view">
+                <h2>Recuperar Senha</h2>
+                <p>Informe seu e-mail para receber um link de redefinição.</p>
+                <form class="auth-form" onsubmit="handleForgot(event)">
+                    <div id="forgotStep1">
+                        <input type="email" id="forgotEmail" placeholder="E-mail cadastrado" required>
+                        <button type="submit" class="auth-btn">Enviar E-mail</button>
+                    </div>
+                </form>
+                <div class="auth-links">
+                    <a onclick="switchAuthView('loginView')">Voltar ao Login</a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- TELA DE BLOQUEIO / LICENÇA -->
+    <section id="lockScreen">
+        <div class="lock-content">
+            <h2>⚠️ Acesso Expirado</h2>
+            <p>Seu período de utilização encerrou.</p>
+            <p>Para continuar utilizando, gere o código abaixo e informe a contra-senha.</p>
+            
+            <button class="lock-btn" onclick="generateRandomCode()">Gerar Código de Desbloqueio</button>
+            <div id="displayRandomCode" class="generated-code-display" style="display:none;"></div>
+            
+            <div style="margin-top: 20px;">
+                <label style="color:white; display:block;">Contra-senha (Formato: XXXXX-YYY)</label>
+                <input type="text" id="unlockInput" placeholder="Ex: 12345-30" style="text-align:center;">
+                <button class="lock-btn" onclick="validateUnlock()">Liberar Acesso</button>
+            </div>
+            
+            <button class="logout-btn" style="position:static; margin-top:20px; border-color:#999;" onclick="handleLogout()">Sair / Trocar Conta</button>
+        </div>
+    </section>
+
+    <!-- MODAL DE CONFIGURAÇÕES -->
+    <div id="settingsModal">
+        <div class="settings-card">
+            <span class="close-settings" onclick="closeSettings()">&times;</span>
+            <h2>Configurações e Assinatura</h2>
+            <hr style="margin: 15px 0;">
+            <p><strong>Usuário:</strong> <span id="settingsUser"></span></p>
+            <p><strong>Status:</strong> <span id="settingsStatus"></span></p>
+            <p><strong>Validade da Licença:</strong> <span id="settingsDate"></span></p>
+            <p style="font-size: 1.2rem; margin-top: 10px; color: var(--primary-color);">
+                <strong>Dias Restantes: </strong> <span id="settingsDaysLeft"></span>
+            </p>
+            <hr style="margin: 15px 0;">
+            <h3>Renovação Antecipada</h3>
+            <p style="font-size: 0.9rem; margin-bottom: 10px;">Caso deseje estender seu prazo antes do vencimento.</p>
+            <button class="btn-demo" onclick="openLockScreenForRenewal()">Inserir Código de Renovação</button>
+            <hr style="margin: 15px 0;">
+            <button class="btn-reset" onclick="limpezaForcada()" style="background-color: #c0392b; width:100%">⚠️ Limpeza Forçada (Reset App)</button>
         </div>
     </div>
 
     <!-- APLICAÇÃO PRINCIPAL -->
-    <div id="app-container" class="hidden">
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <header>
+        <h1>Consultoria Estratégica & Financeira</h1>
+        <p>Sistema de Diagnóstico Empresarial - Firebase Edition</p>
+        <div id="userWelcomeDisplay" class="user-welcome"></div>
         
-        <!-- BARRA LATERAL (MENU) -->
-        <aside>
-            <h2>Gestor MEI</h2>
-            <nav class="flex-col flex w-full">
-                <div class="nav-item active" onclick="navTo('dashboard')">📊 Dashboard</div>
-                <div class="nav-item" onclick="navTo('agenda')">📅 Agenda</div>
-                <div class="nav-item" onclick="navTo('lembretes')">🔔 Lembretes</div> 
-                <div class="nav-item" onclick="navTo('cadastros')">🧾 Cadastros</div>
-                <div class="nav-item" onclick="navTo('financeiro')">💰 Financeiro</div>
-                <div class="nav-item" onclick="navTo('rpa')">📄 Gerador RPA</div>
-                <div class="nav-item" onclick="navTo('fiscal')">🏢 Fiscal & IRRF</div>
-                <div class="nav-item" onclick="navTo('listagens')">📑 Listagens</div>
-                <div class="nav-item" onclick="navTo('configuracoes')">⚙️ Configurações</div>
-            </nav>
-            <div class="user-info">
-                <p>
-                    <span id="sync-indicator" class="sync-status sync-offline" title="Offline / Local"></span>
-                    <span id="user-name-display">Usuário</span>
-                </p>
-                <button class="btn-sync" onclick="manualSync()">🔄 Sincronizar</button>
-                <p id="license-days-display" class="text-success text-sm mt-2">Licença Ativa</p>
-                <button onclick="logout()" class="text-danger text-sm mt-2 w-full text-left" style="background: rgba(220, 38, 38, 0.1); border-radius: 4px; padding: 0.5rem; text-align: center;">🚪 Sair / Logout</button>
+        <div class="header-controls">
+            <div class="cloud-status" title="Conexão Segura">
+                <span class="cloud-dot"></span> Firebase Conectado
             </div>
-        </aside>
-
-        <!-- ÁREA PRINCIPAL DE CONTEÚDO -->
-        <main>
-            <div id="license-warning" class="notification-bar hidden">Sua licença expirou! Contate o administrador.</div>
-
-            <!-- VIEW: DASHBOARD -->
-            <section id="view-dashboard">
-                <div class="view-header"><h1>Visão Geral</h1></div>
-                <div class="dash-grid">
-                    <div class="stat-card"><h3>Receitas (Mês)</h3><div class="stat-value text-success" id="dash-income">R$ 0,00</div></div>
-                    <div class="stat-card"><h3>Despesas (Mês)</h3><div class="stat-value text-danger" id="dash-expense">R$ 0,00</div></div>
-                    <div class="stat-card"><h3>Saldo</h3><div class="stat-value" id="dash-balance">R$ 0,00</div></div>
-                </div>
-                <div class="dash-grid mt-4">
-                    <div class="stat-card" style="border-left: 4px solid var(--info);">
-                        <h3>Reserva (<span id="reserve-percent-display">10</span>%)</h3>
-                        <div class="stat-value text-info" id="dash-reserve">R$ 0,00</div>
-                        <div class="stat-sub">Acumulado das Entradas</div>
-                    </div>
-                    <div class="stat-card" style="border-left: 4px solid var(--warning);">
-                        <h3>Pró-labore (Mês)</h3>
-                        <div class="stat-value text-warning" id="dash-prolabore">R$ 0,00</div>
-                        <div class="stat-sub">Meta: <span id="dash-prolabore-target">R$ 0,00</span></div>
-                    </div>
-                </div>
-                <div class="mt-4 flex gap-4 flex-col md:flex-row">
-                    <div class="stat-card w-full"><h3>📅 Próximos Compromissos Fiscais</h3><ul id="fiscal-reminders" class="mt-4" style="list-style: none;"></ul></div>
-                    <div class="stat-card w-full"><h3>📂 Acesso Rápido</h3><p class="mb-4">Relatórios e Listagens.</p><button class="btn-info w-full" onclick="navTo('listagens')">Ver Listagens</button></div>
-                </div>
-            </section>
-
-            <!-- VIEW: AGENDA -->
-            <section id="view-agenda" class="hidden">
-                <div class="view-header flex justify-between items-center">
-                    <h1>Agenda de Compromissos</h1>
-                    <button class="btn-primary" onclick="openAppointmentModal()">+ Novo Agendamento</button>
-                </div>
-                <div class="flex gap-2 mb-4">
-                    <input type="date" id="agenda-filter-date" onchange="renderAgenda()" style="max-width: 200px; margin:0;">
-                    <button class="btn-outline" onclick="renderAgenda('all')">Ver Todos</button>
-                    <button class="btn-outline" onclick="renderAgenda('today')">Hoje</button>
-                </div>
-                <div id="agenda-list" class="dash-grid"></div>
-            </section>
-
-            <!-- VIEW: LEMBRETES -->
-            <section id="view-lembretes" class="hidden">
-                <div class="view-header"><h1>Gerenciamento de Lembretes</h1></div>
-                
-                <div class="stat-card mb-4">
-                    <h3 id="rem-form-title">🔔 Novo Lembrete</h3>
-                    <form onsubmit="saveReminder(event)">
-                        <input type="hidden" id="rem-id">
-                        
-                        <label>Título do Lembrete</label>
-                        <input type="text" id="rem-title" placeholder="Ex: Pagar Boleto" required>
-                        
-                        <div class="flex gap-2">
-                            <div class="w-full">
-                                <label>Data e Horário</label>
-                                <input type="datetime-local" id="rem-datetime" required>
-                            </div>
-                            <div class="w-full">
-                                <label>Periodicidade</label>
-                                <select id="rem-period">
-                                    <option value="once">Uma vez</option>
-                                    <option value="hourly">Horário</option>
-                                    <option value="daily">Diário</option>
-                                    <option value="weekly">Semanal</option>
-                                    <option value="biweekly">Quinzenal</option>
-                                    <option value="monthly">Mensal</option>
-                                    <option value="yearly">Anual</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <label>E-mail de Destino</label>
-                        <input type="email" id="rem-email" placeholder="seu@email.com" required>
-
-                        <label>Texto da Mensagem</label>
-                        <textarea id="rem-msg" rows="3" required></textarea>
-
-                        <div class="flex gap-2 items-center mt-2 mb-2">
-                            <input type="checkbox" id="rem-immediate" style="width:auto; margin-bottom:0;">
-                            <label for="rem-immediate" style="margin-top:0; margin-bottom:0;">Enviar imediatamente</label>
-                        </div>
-
-                        <div class="flex gap-2 mt-2">
-                            <button type="submit" class="btn-primary w-full" id="rem-btn-save">Salvar Lembrete</button>
-                            <button type="button" class="btn-outline hidden" id="rem-btn-cancel" onclick="cancelReminderEdit()">Cancelar</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="stat-card">
-                    <h4>Lembretes Configurados</h4>
-                    <p class="text-sm text-light mb-2">Envios automáticos gerenciados pelo sistema.</p>
-                    <div class="table-container mt-2">
-                        <table id="reminders-table">
-                            <thead><tr><th>Título</th><th>Próximo Disparo</th><th>Repetição</th><th>Ações</th></tr></thead>
-                            <tbody id="reminders-tbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- VIEW: LISTAGENS -->
-            <section id="view-listagens" class="hidden">
-                <div class="view-header flex justify-between items-center">
-                    <h1>Relatórios</h1>
-                    <div class="no-print">
-                        <button class="btn-primary" onclick="exportReportPDF()">🖨️ PDF</button>
-                        <button class="btn-info" onclick="exportReportDoc()">📄 Word</button>
-                    </div>
-                </div>
-                <div class="tabs no-print">
-                    <button class="tab-btn active" onclick="switchListing('clients')">Clientes</button>
-                    <button class="tab-btn" onclick="switchListing('suppliers')">Fornecedores</button>
-                    <button class="tab-btn" onclick="switchListing('products')">Produtos</button>
-                    <button class="tab-btn" onclick="switchListing('services')">Serviços</button>
-                    <button class="tab-btn" onclick="switchListing('movimentacoes')">Movimentações</button>
-                </div>
-                <div id="movements-filter" class="stat-card mb-4 hidden no-print">
-                    <label>Filtrar por Mês e Ano:</label>
-                    <div class="flex gap-2">
-                        <input type="month" id="listing-month-filter" onchange="renderListingTable()">
-                        <button class="btn-outline" style="width: auto;" onclick="renderListingTable()">Filtrar</button>
-                    </div>
-                </div>
-                <div class="table-container" id="report-print-area">
-                    <h3 id="report-company-header" class="text-center mb-4" style="text-transform: uppercase;"></h3>
-                    <h3 id="report-title" class="hidden text-center">Relatório</h3>
-                    <table id="listing-table"><thead id="listing-thead"></thead><tbody id="listing-tbody"></tbody></table>
-                </div>
-            </section>
-
-            <!-- VIEW: FINANCEIRO -->
-            <section id="view-financeiro" class="hidden">
-                <div class="view-header flex justify-between items-center">
-                    <h1>Movimentações Financeiras</h1>
-                    <button class="btn-primary" onclick="openTransactionModal()">+ Novo Lançamento</button>
-                </div>
-                <div class="flex gap-4 mb-4">
-                    <button class="btn-outline fin-filter-btn active" onclick="filterFinance('all')">Todos</button>
-                    <button class="btn-outline fin-filter-btn" onclick="filterFinance('receita')">Entradas</button>
-                    <button class="btn-outline fin-filter-btn" onclick="filterFinance('despesa')">Saídas</button>
-                </div>
-                <div class="table-container">
-                    <table id="finance-table">
-                        <thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th></tr></thead><tbody></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- VIEW: RPA -->
-            <section id="view-rpa" class="hidden">
-                <div class="view-header no-print"><h1>Gerador de RPA</h1></div>
-                <div class="stat-card mb-4 no-print">
-                    <div class="flex gap-4 flex-col md:flex-row">
-                        <div class="w-full">
-                            <h3 class="mb-2">Automação</h3>
-                            <label>Selecione o Autônomo:</label>
-                            <select id="rpa-provider-select" onchange="fillRPAProvider()"><option value="">Selecione...</option></select>
-                        </div>
-                        <div class="w-full">
-                            <h3 class="mb-2">Ações</h3>
-                            <div class="flex gap-2 mb-2">
-                                <button class="btn-success w-full" onclick="saveRPA()">💾 Salvar RPA</button>
-                                <button class="btn-warning w-full" onclick="toggleRPAHistory()">📜 Histórico</button>
-                            </div>
-                            <div class="flex gap-2 mb-2">
-                                <button class="btn-primary w-full" onclick="exportRPAPdf()">🖨️ PDF</button>
-                                <button class="btn-info w-full" onclick="exportRPADoc()">📄 Word</button>
-                            </div>
-                            <button class="btn-outline w-full" onclick="sendRPAEmail()">📧 Enviar por E-mail (com Anexo)</button>
-                        </div>
-                    </div>
-                    <div id="rpa-history-container" class="hidden mt-4 border-t pt-4">
-                        <h4>Recibos Salvos</h4>
-                        <div class="table-container">
-                            <table id="rpa-history-table"><thead><tr><th>Data</th><th>Autônomo</th><th>Valor Líquido</th><th>Ações</th></tr></thead><tbody></tbody></table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="rpa-paper" id="rpa-content">
-                    <h2 class="text-center mb-4" style="text-decoration: underline;">RECIBO DE PAGAMENTO A AUTÔNOMO (RPA)</h2>
-                    <input type="hidden" id="rpa-id">
-                    <div class="rpa-section">
-                        <h4>1. Contratante (Empresa)</h4>
-                        <label>Razão Social:</label><input type="text" id="rpa-comp-name">
-                        <div class="flex gap-2"><div class="w-full"><label>CNPJ:</label><input type="text" id="rpa-comp-cnpj"></div><div class="w-full"><label>Endereço:</label><input type="text" id="rpa-comp-addr"></div></div>
-                    </div>
-                    <div class="rpa-section">
-                        <h4>2. Autônomo (Prestador)</h4>
-                        <label>Nome Completo:</label><input type="text" id="rpa-prov-name">
-                        <div class="flex gap-2"><div class="w-full"><label>CPF:</label><input type="text" id="rpa-prov-cpf"></div><div class="w-full"><label>Telefone:</label><input type="text" id="rpa-prov-phone"></div></div>
-                        <div class="w-full"><label>Email:</label><input type="email" id="rpa-prov-email" placeholder="email@exemplo.com"></div>
-                        <label>Endereço:</label><input type="text" id="rpa-prov-addr">
-                    </div>
-                    <div class="rpa-section">
-                        <h4>3. Serviço Prestado</h4>
-                        <label>Descrição:</label><input type="text" id="rpa-desc" placeholder="Ex: Consultoria">
-                        <label>Data:</label><input type="date" id="rpa-date">
-                    </div>
-                    <div class="rpa-section">
-                        <h4>4. Valor do Serviço</h4>
-                        <label>Valor Bruto (R$):</label><input type="number" id="rpa-value" step="0.01" oninput="calculateRPA()" placeholder="0,00">
-                    </div>
-                    <div class="rpa-section">
-                        <h4>5. Cálculo dos Descontos</h4>
-                        <div class="flex gap-2">
-                            <div class="w-full"><label>a) INSS (11%):</label><input type="text" id="rpa-inss" readonly></div>
-                            <div class="w-full"><label>b) ISS (%: <input type="number" id="rpa-iss-rate" value="3" style="width:50px;display:inline;" oninput="calculateRPA()">):</label><input type="text" id="rpa-iss-val" readonly></div>
-                        </div>
-                        <label>c) IRRF:</label><input type="text" id="rpa-irrf" readonly>
-                        <hr class="mt-2 mb-2">
-                        <label style="font-size: 1.2rem; color: var(--primary);">➡ Valor Líquido:</label>
-                        <input type="text" id="rpa-net" readonly style="font-size: 1.5rem; font-weight: bold;">
-                    </div>
-                    <div class="rpa-section" style="border:none;">
-                        <h4>6. Declaração</h4>
-                        <p style="text-align: justify; font-size: 0.9rem;">Declaro que prestei os serviços acima descritos e recebi da contratante o valor líquido correspondente, dando o presente recibo como pago e quitado.</p>
-                        <br><br>
-                        <div class="flex gap-4">
-                            <div class="w-full text-center"><p>______________________________________</p><p><strong>Prestador</strong></p><p>Data: ____ / ____ / ______</p></div>
-                            <div class="w-full text-center"><p>______________________________________</p><p><strong>Contratante</strong></p><p>Data: ____ / ____ / ______</p></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- VIEW: CADASTROS -->
-            <section id="view-cadastros" class="hidden">
-                <div class="view-header"><h1>Cadastros</h1></div>
-                <div class="flex gap-2 mb-4 overflow-x-auto">
-                    <button class="btn-outline crud-btn" onclick="renderCrud('products')">Produtos</button>
-                    <button class="btn-outline crud-btn" onclick="renderCrud('services')">Serviços</button>
-                    <button class="btn-outline crud-btn" onclick="renderCrud('clients')">Clientes</button>
-                    <button class="btn-outline crud-btn" onclick="renderCrud('suppliers')">Fornecedores</button>
-                </div>
-                <div id="crud-area" class="stat-card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 id="crud-title">Itens</h3>
-                        <button class="btn-primary" onclick="openCrudModal(false)">+ Adicionar</button>
-                    </div>
-                    <div class="table-container"><table id="crud-table"></table></div>
-                </div>
-            </section>
-
-            <!-- VIEW: FISCAL -->
-            <section id="view-fiscal" class="hidden">
-                <div class="view-header"><h1>Fiscal & Obrigações</h1></div>
-                <div class="dash-grid">
-                    <div class="stat-card text-center">
-                        <h3>Emitir Nota Fiscal</h3>
-                        <p class="text-sm text-light mb-4">Link Configurado</p>
-                        <a id="link-emissor" href="#" target="_blank" class="btn-primary">Acessar Emissor</a>
-                    </div>
-                    <div class="stat-card">
-                        <h3>DAS MEI</h3>
-                        <p class="mb-2">Vencimento dia 20.</p>
-                        <a id="link-das" href="#" target="_blank" class="btn-outline w-full text-center">Gerar Boleto DAS</a>
-                    </div>
-                </div>
-                <div class="stat-card mt-4">
-                    <div class="flex justify-between items-center mb-2"><h3>Tabela IRRF</h3><button class="btn-info action-btn" onclick="openIrrfModal()">+ Faixa</button></div>
-                    <div class="table-container mt-2"><table id="irrf-table-display"><thead><tr><th>Até Base (R$)</th><th>%</th><th>Dedução</th><th>X</th></tr></thead><tbody id="irrf-table-body"></tbody></table></div>
-                </div>
-            </section>
-
-            <!-- VIEW: CONFIGURAÇÕES -->
-            <section id="view-configuracoes" class="hidden">
-                <div class="view-header"><h1>Configurações</h1></div>
-                <div class="stat-card mb-4">
-                    <h3>🏢 Dados da Empresa & URLs</h3>
-                    <form onsubmit="saveCompanyData(event)">
-                        <label>Nome Fantasia</label><input type="text" id="conf-company-name" required>
-                        <div class="flex gap-2">
-                            <div class="w-full"><label>CNPJ</label><input type="text" id="conf-cnpj"></div>
-                            <div class="w-full"><label>Telefone</label><input type="text" id="conf-phone"></div>
-                        </div>
-                        <label>Endereço Completo</label><input type="text" id="conf-address">
-                        <label>WhatsApp</label><input type="text" id="conf-whatsapp">
-                        <label>E-mail do Autônomo</label><input type="email" id="conf-auth-email" placeholder="email@exemplo.com">
-                        
-                        <label>Atuação</label>
-                        <select id="conf-role">
-                            <option value="both">Vendedor e Prestador</option>
-                            <option value="seller">Vendedor</option>
-                            <option value="provider">Prestador</option>
-                        </select>
-                        <hr class="mt-4 mb-4">
-                        <h4>Parâmetros Financeiros</h4>
-                        <div class="flex gap-2">
-                            <div class="w-full"><label>Percentual Reserva (%)</label><input type="number" id="conf-reserve-rate" step="0.1" placeholder="Sugestão: 10"></div>
-                            <div class="w-full"><label>Meta Pró-labore (R$)</label><input type="number" id="conf-prolabore-target" step="0.01" placeholder="Padrão: 4000.00"></div>
-                        </div>
-                        <hr class="mt-4 mb-4">
-                        <h4>Links Externos</h4>
-                        <label>URL Emissor Fiscal</label><input type="url" id="conf-url-fiscal" placeholder="Padrão do Governo...">
-                        <label>URL Geração DAS</label><input type="url" id="conf-url-das" placeholder="Padrão do Governo...">
-                        <button type="submit" class="btn-primary mt-2">Salvar Dados</button>
-                    </form>
-                </div>
-                
-                <!-- ÁREA DE GESTÃO DE USUÁRIOS (RESTRICTED ID) -->
-                <div id="admin-panel" class="stat-card mb-4 hidden">
-                    <h3>👥 Gestão de Usuários (Admin)</h3>
-                    <p class="text-sm text-light mb-2">Acesso restrito a administradores.</p>
-                    <button class="btn-info w-full" onclick="openUserManagementModal()">📂 Abrir Lista de Usuários</button>
-                </div>
-
-                <div class="stat-card mb-4">
-                    <h3>💾 Backup & Sincronização</h3>
-                    <div class="flex gap-4 mt-2 items-center flex-wrap">
-                        <button class="btn-info" onclick="downloadBackup()">📥 Backup (.json)</button>
-                        <div class="flex flex-col"><label style="margin-top:0">Restaurar</label><input type="file" id="restore-file" accept=".json" onchange="restoreBackup(this)"></div>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- MODAL: TRANSAÇÃO FINANCEIRA -->
-    <div id="modal-transaction" class="modal-overlay hidden" onclick="if(event.target===this) closeModal('modal-transaction')">
-        <div class="modal">
-            <h2>Lançamento Financeiro</h2>
-            <form id="form-transaction" onsubmit="saveTransaction(event)">
-                <input type="hidden" id="trans-id">
-                <label>Tipo</label><select id="trans-type" onchange="updateTransactionDependencies()" required><option value="receita">Entrada</option><option value="despesa">Saída</option></select>
-                <label>Categoria</label><select id="trans-category" required></select>
-                <label>Valor</label><input type="number" id="trans-value" step="0.01" required>
-                <label>Data</label><input type="date" id="trans-date" required>
-                <label>Cliente/Fornecedor</label><select id="trans-entity"><option value="">Selecione...</option></select>
-                <label>Descrição</label><textarea id="trans-obs" rows="3"></textarea>
-                <div class="flex gap-2 mt-4"><button type="button" class="btn-outline w-full" onclick="closeModal('modal-transaction')">Cancelar</button><button type="submit" class="btn-primary w-full">Salvar</button></div>
-            </form>
+            <button class="header-btn" onclick="openSettings()">
+                Configurações 
+                <span id="daysBadge" class="remaining-days-badge"></span>
+            </button>
+            <button class="header-btn" onclick="handleLogout()">Sair</button>
         </div>
-    </div>
+    </header>
 
-    <!-- MODAL: CRUD GENÉRICO -->
-    <div id="modal-crud" class="modal-overlay hidden" onclick="if(event.target===this) closeModal('modal-crud')">
-        <div class="modal">
-            <h2 id="modal-crud-title">Item</h2>
-            <form id="form-crud" onsubmit="saveCrudItem(event)">
-                <input type="hidden" id="crud-id">
-                <div id="crud-fields"></div>
-                <div class="flex gap-2 mt-4"><button type="button" class="btn-outline w-full" onclick="closeModal('modal-crud')">Cancelar</button><button type="submit" class="btn-primary w-full">Salvar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: IRRF -->
-    <div id="modal-irrf" class="modal-overlay hidden" onclick="if(event.target===this) closeModal('modal-irrf')">
-        <div class="modal">
-            <h2>Faixa IRRF</h2>
-            <form id="form-irrf" onsubmit="saveIrrfRow(event)">
-                <input type="hidden" id="irrf-id">
-                <label>Até Base (R$)</label><input type="number" step="0.01" id="irrf-max" required>
-                <label>%</label><input type="number" step="0.01" id="irrf-rate" required>
-                <label>Dedução</label><input type="number" step="0.01" id="irrf-deduction" required>
-                <div class="flex gap-2 mt-4"><button type="button" class="btn-outline w-full" onclick="closeModal('modal-irrf')">Cancelar</button><button type="submit" class="btn-primary w-full">Salvar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: AGENDAMENTO -->
-    <div id="modal-appointment" class="modal-overlay hidden" onclick="if(event.target===this) closeModal('modal-appointment')">
-        <div class="modal">
-            <h2>Agendamento</h2>
-            <form id="form-appointment" onsubmit="saveAppointment(event)">
-                <input type="hidden" id="appt-id">
-                <label>Título do Compromisso</label><input type="text" id="appt-title" required placeholder="Ex: Atendimento João">
-                <div class="flex gap-2">
-                    <div class="w-full"><label>Data</label><input type="date" id="appt-date" required></div>
-                    <div class="w-full"><label>Hora</label><input type="time" id="appt-time" required></div>
+    <div class="container">
+        <!-- FORMULÁRIO -->
+        <form id="diagnosisForm">
+            <!-- Etapa 1: Dados Gerais -->
+            <div class="step active" data-title="Dados Gerais">
+                <div class="step-header">
+                    <h2>1. Dados Gerais da Empresa</h2>
+                    <button type="button" class="btn-demo" onclick="fillDemoData()">🧪 Preencher Teste</button>
                 </div>
-                <div class="flex gap-2 items-end">
-                    <div class="w-full">
-                        <label>Buscar Cliente (Opcional)</label>
-                        <select id="appt-client-select" onchange="fillAppointmentClient()"></select>
+                <div class="form-group">
+                    <label>Nome da Empresa * 
+                        <span class="help-icon">?<span class="help-tooltip">Nome fantasia ou Razão Social da empresa. Ex: Padaria Pão Quente Ltda.</span></span>
+                    </label>
+                    <input type="text" name="empresa_nome" required>
+                </div>
+                <div class="form-group">
+                    <label>CNPJ
+                        <span class="help-icon">?<span class="help-tooltip">Cadastro Nacional da Pessoa Jurídica. Formato: 00.000.000/0000-00.</span></span>
+                    </label>
+                    <input type="text" name="empresa_cnpj" placeholder="00.000.000/0000-00">
+                </div>
+                <div class="form-group">
+                    <label>Segmento / Atividade Principal *
+                        <span class="help-icon">?<span class="help-tooltip">Qual o ramo do seu negócio? Ex: Varejo de Roupas, Consultoria de TI, Restaurante.</span></span>
+                    </label>
+                    <input type="text" name="empresa_segmento" required>
+                </div>
+                <div class="form-group">
+                    <label>Tempo de Atuação (anos)
+                        <span class="help-icon">?<span class="help-tooltip">Há quantos anos a empresa está ativa no mercado?</span></span>
+                    </label>
+                    <input type="number" name="empresa_tempo" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Número de Funcionários
+                        <span class="help-icon">?<span class="help-tooltip">Total de colaboradores (CLT + PJ) que trabalham na operação.</span></span>
+                    </label>
+                    <input type="number" name="empresa_funcionarios" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Faturamento Médio Mensal
+                        <span class="help-icon">?<span class="help-tooltip">Média de vendas brutas dos últimos 6 meses.</span></span>
+                    </label>
+                    <div class="input-symbol-wrapper">
+                        <input type="number" name="empresa_faturamento" step="0.01">
                     </div>
                 </div>
-                <div class="flex gap-2">
-                    <div class="w-full"><label>Nome do Cliente</label><input type="text" id="appt-client-name" required></div>
-                    <div class="w-full"><label>Telefone</label><input type="text" id="appt-client-phone"></div>
+                <div class="form-group">
+                    <label>Regime Tributário
+                        <span class="help-icon">?<span class="help-tooltip">Como sua empresa paga impostos? MEI, Simples Nacional, Lucro Presumido ou Real.</span></span>
+                    </label>
+                    <select name="empresa_regime">
+                        <option value="">Selecione...</option>
+                        <option value="MEI">MEI</option>
+                        <option value="Simples Nacional">Simples Nacional</option>
+                        <option value="Lucro Presumido">Lucro Presumido</option>
+                        <option value="Lucro Real">Lucro Real</option>
+                    </select>
                 </div>
-                <label>Descrição do Serviço</label><textarea id="appt-desc" rows="2"></textarea>
-                <div class="flex gap-2">
-                    <div class="w-full"><label>Valor (R$)</label><input type="number" step="0.01" id="appt-value" placeholder="0.00"></div>
-                    <div class="w-full"><label>Status</label><select id="appt-status"><option value="agendado">Agendado</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option></select></div>
+                <div class="form-group">
+                    <label>Público-alvo Principal
+                        <span class="help-icon">?<span class="help-tooltip">B2C = Vende para pessoas físicas. B2B = Vende para outras empresas.</span></span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="empresa_publico" value="B2C"> Consumidor Final (B2C)</label>
+                        <label class="radio-option"><input type="radio" name="empresa_publico" value="B2B"> Empresas (B2B)</label>
+                        <label class="radio-option"><input type="radio" name="empresa_publico" value="Hibrido"> Ambos</label>
+                    </div>
                 </div>
-                <div class="flex gap-2">
-                    <div class="w-full"><label>Forma Pagto.</label><select id="appt-pay-method"><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option></select></div>
-                    <div class="w-full"><label>Status Pagto.</label><select id="appt-pay-status"><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div>
-                </div>
-                <label>Observações</label><textarea id="appt-obs" rows="2"></textarea>
-                <div class="flex gap-2 mt-4"><button type="button" class="btn-outline w-full" onclick="closeModal('modal-appointment')">Cancelar</button><button type="submit" class="btn-primary w-full">Salvar Agendamento</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: GESTÃO DE USUÁRIOS (ADMIN) -->
-    <div id="modal-usermgmt" class="modal-overlay hidden" onclick="if(event.target===this) closeModal('modal-usermgmt')">
-        <div class="modal" style="max-width: 800px;">
-            <h2>Lista de Usuários Cadastrados</h2>
-            <div class="table-container mt-2" style="max-height: 400px; overflow-y: auto;">
-                <table id="usermgmt-table">
-                    <thead><tr><th>Nome</th><th>E-mail</th><th>Licença Expira em</th><th>Ações</th></tr></thead>
-                    <tbody id="usermgmt-tbody"></tbody>
-                </table>
             </div>
-            <div class="mt-4 text-center">
-                <button type="button" class="btn-outline" onclick="closeModal('modal-usermgmt')">Fechar</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- MODAL: CRÉDITOS (ADMIN) -->
-    <div id="modal-credits" class="modal-overlay hidden" onclick="if(event.target===this) closeModal('modal-credits')">
-        <div class="modal" style="max-width: 400px;">
-            <h2>Gerenciar Créditos</h2>
-            <p id="credit-user-display" class="mb-4 text-primary font-bold"></p>
-            <input type="hidden" id="credit-user-id">
+            <!-- Etapa 2: Financeiro e Custos -->
+            <div class="step" data-title="Financeiro">
+                <div class="step-header">
+                    <h2>2. Financeiro e Custos</h2>
+                </div>
+                <div class="form-group">
+                    <label>Possui controle de custos detalhado? 
+                        <span class="help-icon">?
+                            <span class="help-tooltip">A empresa registra cada centavo gasto? Ex: Planilhas completas ou Software de Gestão.</span>
+                        </span>
+                    </label>
+                    <select name="fin_controle">
+                        <option value="Nao">Não</option>
+                        <option value="Parcial">Parcialmente</option>
+                        <option value="Sim">Sim, total</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Custos Fixos Mensais (Estimativa)
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Custos que não mudam se vender mais ou menos. Ex: Aluguel, Salários, Internet.</span>
+                        </span>
+                    </label>
+                    <div class="input-symbol-wrapper">
+                        <input type="number" name="fin_custos_fixos" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Custos Variáveis Principais
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Custos atrelados à venda. Ex: Matéria-prima, Taxa de cartão, Comissão.</span>
+                        </span>
+                    </label>
+                    <textarea name="fin_custos_variaveis" placeholder="Liste os principais..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Existe controle de margem por produto/serviço?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Você sabe exatamente quanto lucra em cada item vendido, descontando todos os custos?</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="fin_margem" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="fin_margem" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Conhece o Ponto de Equilíbrio?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">O valor mínimo que a empresa precisa faturar para pagar todas as contas (Zero a Zero).</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="fin_ponto_equilibrio" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="fin_ponto_equilibrio" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Possui Dívidas Atuais?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Empréstimos bancários, dívidas com fornecedores ou impostos atrasados.</span>
+                        </span>
+                    </label>
+                    <textarea name="fin_dividas" placeholder="Se sim, quais e valores aproximados..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Realiza Fluxo de Caixa Projetado?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Previsão das entradas e saídas futuras para saber se faltará dinheiro no fim do mês.</span>
+                        </span>
+                    </label>
+                    <select name="fin_fluxo_caixa">
+                        <option value="Nao">Não</option>
+                        <option value="Sim">Sim</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Etapa 3: Precificação -->
+            <div class="step" data-title="Precificação">
+                <div class="step-header">
+                    <h2>3. Precificação e Lucratividade</h2>
+                </div>
+                <div class="form-group">
+                    <label>Como os preços são definidos?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Ex: Multiplico custo por 2, copio o concorrente, uso markup técnico, etc.</span>
+                        </span>
+                    </label>
+                    <textarea name="prec_metodo"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Produtos mais vendidos (Top 3)
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Quais são os itens "Carro-Chefe" da empresa?</span>
+                        </span>
+                    </label>
+                    <input type="text" name="prec_top_vendas">
+                </div>
+                <div class="form-group">
+                    <label>Produtos com menor margem/lucro
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Produtos que vendem mas deixam pouco dinheiro no caixa.</span>
+                        </span>
+                    </label>
+                    <input type="text" name="prec_menor_lucro">
+                </div>
+                <div class="form-group">
+                    <label>Ticket Médio (Valor médio por venda)
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Faturamento total dividido pelo número de vendas no período.</span>
+                        </span>
+                    </label>
+                    <div class="input-symbol-wrapper">
+                        <input type="number" name="prec_ticket_medio" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Política de Descontos
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Regras para dar desconto. Ex: 10% à vista, 5% acima de R$500.</span>
+                        </span>
+                    </label>
+                    <textarea name="prec_descontos" placeholder="Como e quando são aplicados descontos?"></textarea>
+                </div>
+            </div>
+
+            <!-- Etapa 4: Atendimento -->
+            <div class="step" data-title="Atendimento">
+                <div class="step-header">
+                    <h2>4. Atendimento ao Cliente</h2>
+                </div>
+                <div class="form-group">
+                    <label>Canais de atendimento utilizados
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Por onde o cliente fala com você? WhatsApp, Fone, Email, Chat.</span>
+                        </span>
+                    </label>
+                    <input type="text" name="atend_canais" placeholder="WhatsApp, Email, Telefone, Instagram...">
+                </div>
+                <div class="form-group">
+                    <label>Tempo médio de resposta
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Quanto tempo leva para o cliente ser respondido no primeiro contato?</span>
+                        </span>
+                    </label>
+                    <select name="atend_tempo">
+                        <option value="Imediato">Imediato</option>
+                        <option value="Ate 1h">Até 1 hora</option>
+                        <option value="Ate 24h">Até 24 horas</option>
+                        <option value="Mais de 24h">Mais de 24 horas</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Existe pós-venda estruturado?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Entrar em contato após a venda para verificar satisfação e oferecer novos produtos.</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="atend_posvenda" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="atend_posvenda" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Principais reclamações dos clientes
+                        <span class="help-icon">?
+                            <span class="help-tooltip">O que o cliente mais reclama? Preço, demora, qualidade?</span>
+                        </span>
+                    </label>
+                    <textarea name="atend_reclamacoes"></textarea>
+                </div>
+            </div>
+
+            <!-- Etapa 5: Vendas -->
+            <div class="step" data-title="Vendas">
+                <div class="step-header">
+                    <h2>5. Vendas e Processo Comercial</h2>
+                </div>
+                <div class="form-group">
+                    <label>Principais canais de aquisição de clientes
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Como os clientes chegam até você? (Indicação, Google, Instagram, Porta a porta).</span>
+                        </span>
+                    </label>
+                    <input type="text" name="vendas_canais_aquisicao">
+                </div>
+                <div class="form-group">
+                    <label>Funil de Vendas definido?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Etapas claras: Visitante -> Lead -> Oportunidade -> Negociação -> Venda.</span>
+                        </span>
+                    </label>
+                    <select name="vendas_funil">
+                        <option value="Nao">Não</option>
+                        <option value="Sim">Sim, etapas claras</option>
+                        <option value="Mais ou menos">Informalmente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Possui metas de vendas definidas?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Há um valor mensal alvo que todos conhecem? Ex: R$ 50k/mês.</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="vendas_metas" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="vendas_metas" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Principais motivos de perda de vendas
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Por que o cliente desiste na hora H? Preço, Prazo, Atendimento...</span>
+                        </span>
+                    </label>
+                    <textarea name="vendas_perdas" placeholder="Ex: Preço, Prazo, Atendimento..."></textarea>
+                </div>
+            </div>
+
+            <!-- Etapa 6: Promoções -->
+            <div class="step" data-title="Promoções">
+                <div class="step-header">
+                    <h2>6. Promoções e Campanhas</h2>
+                </div>
+                <div class="form-group">
+                    <label>Realiza promoções com frequência?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Liquidações, Black Friday, Descontos sazonais.</span>
+                        </span>
+                    </label>
+                    <select name="promo_frequencia">
+                        <option value="Raramente">Raramente</option>
+                        <option value="Mensalmente">Mensalmente</option>
+                        <option value="Sazonalmente">Apenas datas sazonais</option>
+                        <option value="Sempre">Quase sempre</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Avalia o resultado (ROI) das campanhas?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Calcula quanto lucrou para cada real gasto na promoção?</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="promo_analise" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="promo_analise" value="Nao"> Não</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Etapa 7: Marketing Digital -->
+            <div class="step" data-title="Mkt Digital">
+                <div class="step-header">
+                    <h2>7. Marketing Digital e Redes Sociais</h2>
+                </div>
+                <div class="form-group">
+                    <label>Redes Sociais ativas
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Quais redes a empresa mantém atualizadas? Insta, Facebook, LinkedIn.</span>
+                        </span>
+                    </label>
+                    <input type="text" name="mkt_redes" placeholder="Instagram, Facebook, LinkedIn, TikTok...">
+                </div>
+                <div class="form-group">
+                    <label>Frequência de postagens
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Quantas vezes por semana você posta conteúdo?</span>
+                        </span>
+                    </label>
+                    <input type="text" name="mkt_frequencia">
+                </div>
+                <div class="form-group">
+                    <label>As redes sociais geram vendas diretas?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">O cliente vê o post e compra, ou a rede é apenas para "boniteza"?</span>
+                        </span>
+                    </label>
+                    <select name="mkt_converte">
+                        <option value="Nao">Não, só vitrine</option>
+                        <option value="Pouco">Pouco</option>
+                        <option value="Muito">Sim, é o principal canal</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Etapa 8: Tráfego Orgânico -->
+            <div class="step" data-title="Orgânico">
+                <div class="step-header">
+                    <h2>8. Tráfego Orgânico e SEO</h2>
+                </div>
+                <div class="form-group">
+                    <label>A empresa aparece no Google (Meu Negócio)?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Se alguém buscar seu nome ou serviço na cidade, seu mapa aparece?</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="seo_gmn" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="seo_gmn" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Produz conteúdo (Blog/Youtube)?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Marketing de conteúdo para atrair clientes sem pagar anúncio.</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="seo_conteudo" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="seo_conteudo" value="Nao"> Não</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Etapa 9: Tráfego Pago -->
+            <div class="step" data-title="Tráfego Pago">
+                <div class="step-header">
+                    <h2>9. Tráfego Pago (Anúncios)</h2>
+                </div>
+                <div class="form-group">
+                    <label>Investe em anúncios pagos?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Google Ads, Facebook Ads, Instagram Ads (impulsionar).</span>
+                        </span>
+                    </label>
+                    <select name="ads_investe" onchange="toggleAdsDetail(this.value)">
+                        <option value="Nao">Não</option>
+                        <option value="Sim">Sim</option>
+                    </select>
+                </div>
+                <div id="adsDetails" style="display:none;">
+                    <div class="form-group">
+                        <label>Plataformas (Google/Meta)
+                            <span class="help-icon">?
+                                <span class="help-tooltip">Onde você coloca dinheiro? Instagram, Google Search, Youtube?</span>
+                            </span>
+                        </label>
+                        <input type="text" name="ads_plataformas">
+                    </div>
+                    <div class="form-group">
+                        <label>Investimento Mensal Médio
+                            <span class="help-icon">?
+                                <span class="help-tooltip">Valor total gasto com as plataformas de anúncio.</span>
+                            </span>
+                        </label>
+                        <div class="input-symbol-wrapper">
+                            <input type="number" name="ads_valor" step="0.01">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Sabe o Custo por Lead/Venda?
+                             <span class="help-icon">?
+                                <span class="help-tooltip">Quanto custa cada cliente que entra em contato através do anúncio?</span>
+                            </span>
+                        </label>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="ads_cpl" value="Sim"> Sim</label>
+                            <label class="radio-option"><input type="radio" name="ads_cpl" value="Nao"> Não</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Etapa 10: Site -->
+            <div class="step" data-title="Site">
+                <div class="step-header">
+                    <h2>10. Site e Landing Pages</h2>
+                </div>
+                <div class="form-group">
+                    <label>Possui Site Institucional ou Loja?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Um domínio próprio (www.suaempresa.com.br).</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="site_possui" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="site_possui" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Utiliza ferramentas de análise (Google Analytics)?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Ferramentas que mostram quantos visitantes o site teve e de onde vieram.</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="site_analytics" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="site_analytics" value="Nao"> Não</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Etapa 11: Tecnologia -->
+            <div class="step" data-title="Tecnologia">
+                <div class="step-header">
+                    <h2>11. ERP, Sistemas e Tecnologia</h2>
+                </div>
+                <div class="form-group">
+                    <label>Utiliza sistema de gestão (ERP)?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Sistema integrado que controla estoque, vendas e financeiro. Ex: Bling, Tiny, Totvs.</span>
+                        </span>
+                    </label>
+                    <input type="text" name="tec_erp" placeholder="Nome do sistema ou 'Não'">
+                </div>
+                <div class="form-group">
+                    <label>Utiliza CRM para gestão de clientes?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Sistema para registrar interações, histórico e follow-up com clientes.</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="tec_crm" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="tec_crm" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Há muito retrabalho manual ou planilhas?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Você precisa digitar a mesma coisa em dois lugares diferentes?</span>
+                        </span>
+                    </label>
+                    <select name="tec_manual">
+                        <option value="Nao">Não, tudo integrado</option>
+                        <option value="Pouco">Alguns processos</option>
+                        <option value="Muito">Sim, muito manual</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Etapa 12: Marketplaces -->
+            <div class="step" data-title="Marketplaces">
+                <div class="step-header">
+                    <h2>12. Marketplaces e Canais Externos</h2>
+                </div>
+                <div class="form-group">
+                    <label>Vende em Marketplaces (ML, Shopee, Amazon)?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Plataformas de terceiros onde você expõe seus produtos.</span>
+                        </span>
+                    </label>
+                    <select name="mktp_vende" onchange="toggleMktpDetail(this.value)">
+                        <option value="Nao">Não</option>
+                        <option value="Sim">Sim</option>
+                    </select>
+                </div>
+                <div id="mktpDetails" style="display:none;">
+                    <div class="form-group">
+                        <label>Quais plataformas?
+                            <span class="help-icon">?
+                                <span class="help-tooltip">Liste as principais. Ex: Mercado Livre, Magalu, Shopee.</span>
+                            </span>
+                        </label>
+                        <input type="text" name="mktp_quais">
+                    </div>
+                    <div class="form-group">
+                        <label>Controle de estoque é integrado?
+                             <span class="help-icon">?
+                                <span class="help-tooltip">Quando vende no Mercado Livre, baixa automaticamente do seu sistema?</span>
+                            </span>
+                        </label>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="mktp_estoque" value="Sim"> Sim</label>
+                            <label class="radio-option"><input type="radio" name="mktp_estoque" value="Nao"> Não</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Etapa 13: Pessoas -->
+            <div class="step" data-title="Pessoas">
+                <div class="step-header">
+                    <h2>13. Pessoas e Processos</h2>
+                </div>
+                <div class="form-group">
+                    <label>As funções dos funcionários são bem definidas?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Cada um sabe exatamente o que deve fazer, ou todos fazem tudo?</span>
+                        </span>
+                    </label>
+                    <select name="pp_funcoes">
+                        <option value="Sim">Sim, claras</option>
+                        <option value="Parcial">Parcialmente</option>
+                        <option value="Nao">Não, todos fazem tudo</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Existem processos documentados (POP)?
+                         <span class="help-icon">?
+                            <span class="help-tooltip">Procedimento Operacional Padrão: Manuais de como fazer as tarefas da empresa.</span>
+                        </span>
+                    </label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="pp_processos" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="pp_processos" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Principais gargalos operacionais hoje
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Onde a operação trava? Entrega, Produção, Financeiro?</span>
+                        </span>
+                    </label>
+                    <textarea name="pp_gargalos"></textarea>
+                </div>
+            </div>
+
+            <!-- Etapa 14: Objetivos -->
+            <div class="step" data-title="Objetivos">
+                <div class="step-header">
+                    <h2>14. Objetivos da Consultoria</h2>
+                </div>
+                <div class="form-group">
+                    <label>Quais os maiores problemas atuais?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">O que tira seu sono hoje? Falta de dinheiro, falta de vendas, equipe desmotivada?</span>
+                        </span>
+                    </label>
+                    <textarea name="obj_problemas" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Onde a empresa mais perde dinheiro/oportunidade?
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Onde você acha que o dinheiro está escorrendo pelo ralo?</span>
+                        </span>
+                    </label>
+                    <textarea name="obj_perda_dinheiro"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Objetivo Principal (Curto Prazo)
+                        <span class="help-icon">?
+                            <span class="help-tooltip">O que precisa ser resolvido nos próximos 30 dias?</span>
+                        </span>
+                    </label>
+                    <input type="text" name="obj_principal">
+                </div>
+                <div class="form-group">
+                    <label>Meta para 6 e 12 meses
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Onde você quer estar daqui a um ano?</span>
+                        </span>
+                    </label>
+                    <textarea name="obj_metas"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Observações Finais
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Algo mais que o consultor precise saber?</span>
+                        </span>
+                    </label>
+                    <textarea name="obj_obs"></textarea>
+                </div>
+            </div>
+
+            <!-- Navegação -->
+            <div class="nav-buttons">
+                <button type="button" class="btn-prev" id="prevBtn" onclick="nextPrev(-1)">Voltar</button>
+                <button type="button" class="btn-next" id="nextBtn" onclick="nextPrev(1)">Próximo</button>
+                <button type="button" class="btn-submit" id="submitBtn" onclick="generateReport()" style="display:none;">Gerar Diagnóstico</button>
+            </div>
+        </form>
+
+        <!-- ÁREA DO RELATÓRIO -->
+        <div id="reportSection">
+            <div class="report-header">
+                <h1>Relatório de Diagnóstico Inicial</h1>
+                <p>Gerado em: <span id="reportDate"></span></p>
+                <p>Usuário Responsável: <span id="reportUser"></span></p>
+                <small style="color:#777">Dados recuperados do Firebase</small>
+            </div>
             
-            <div class="mb-4">
-                <label>Tipo de Ajuste:</label>
-                <div class="flex gap-4">
-                    <label style="font-weight:normal; display:flex; align-items:center; gap:5px;"><input type="radio" name="creditType" value="days" checked onchange="toggleCreditMode()"> Adicionar Dias</label>
-                    <label style="font-weight:normal; display:flex; align-items:center; gap:5px;"><input type="radio" name="creditType" value="date" onchange="toggleCreditMode()"> Definir Data Limite</label>
+            <div id="reportContent">
+                <!-- Conteúdo gerado via JS -->
+            </div>
+
+            <div id="adviceSection">
+                <h2>Próximos Passos</h2>
+                <div id="adviceContent">
+                    <p>Gere um backup e envie para análise.</p>
                 </div>
             </div>
 
-            <div id="credit-mode-days">
-                <label>Dias a adicionar:</label>
-                <input type="number" id="credit-days-input" placeholder="Ex: 30, 90, 365">
-            </div>
-
-            <div id="credit-mode-date" class="hidden">
-                <label>Nova Data de Validade:</label>
-                <input type="date" id="credit-date-input">
-            </div>
-
-            <div class="flex gap-2 mt-4">
-                <button type="button" class="btn-outline w-full" onclick="closeModal('modal-credits')">Cancelar</button>
-                <button type="button" class="btn-success w-full" onclick="saveUserCredits()">Confirmar</button>
+            <div class="action-bar">
+                <button class="btn-ai" onclick="generateAdvice()">💡 Gerar Plano de Ação (IA)</button>
+                <button class="btn-backup" onclick="backupData()">💾 Backup</button>
+                <button class="btn-restore" onclick="restoreData()">📂 Restore</button>
+                <input type="file" id="restoreInput" style="display:none" onchange="handleFileSelect(event)">
+                <button class="btn-prev" onclick="editForm()">Editar Respostas</button>
+                <button class="btn-print" onclick="window.print()">Salvar PDF / Imprimir</button>
+                <button class="btn-reset" onclick="clearData()">Limpar Dados</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: ALERTA AUTOMÁTICO DE LEMBRETE -->
-    <div id="modal-alert" class="modal-overlay hidden">
-        <div class="modal" style="max-width: 400px; text-align: center; border-left: 5px solid var(--warning);">
-            <h2 id="alert-title" class="mb-2">🔔 Lembrete!</h2>
-            <p id="alert-msg" class="mb-4 text-lg"></p>
-            <p id="alert-time" class="text-sm text-light mb-4"></p>
-            <div class="flex flex-col gap-2">
-                <a id="alert-btn-email" href="#" class="btn-primary w-full">📧 Enviar Email Agora (Manual)</a>
-                <button class="btn-outline w-full" onclick="closeModal('modal-alert')">Fechar</button>
-            </div>
-        </div>
-    </div>
+    <footer>
+        <a href="https://www.websitelog.com.br" target="_blank">www.websitelog.com.br</a>
+    </footer>
 
-    <!-- Script Principal - VERSÃO ATUALIZADA PARA 12.13 PARA LIMPAR CACHE DO GITHUB -->
-    <script src="script.js?v=12.13"></script>
+    <!-- Link para o arquivo JavaScript -->
+    <script src="script.js"></script>
 </body>
 </html>
-
