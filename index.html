@@ -806,7 +806,42 @@
             <div id="adviceSection">
                 <h2>Próximos Passos</h2>
                 <div id="adviceContent">
-                    <p>Gere um backup e envie para análise.</p>
+                   <!-- ÁREA DO RELATÓRIO -->
+        <div id="reportSection">
+            <div class="report-header">
+                <h1>Relatório de Diagnóstico Inicial</h1>
+                <p>Gerado em: <span id="reportDate"></span></p>
+                <p>Usuário Responsável: <span id="reportUser"></span></p>
+                <small style="color:#777">Dados recuperados do Firebase</small>
+            </div>
+            
+            <div id="reportContent">
+                <!-- Conteúdo gerado via JS -->
+            </div>
+
+            <!-- ESTE É O BLOCO ALTERADO -->
+            <div id="adviceSection">
+                <h2>Próximos Passos</h2>
+                <div id="adviceContent">
+                    <div class="docx-action-container">
+                        <button type="button" class="btn-docx-consultant" onclick="generateDocxForConsultant()">
+                            📄 Gerar Arquivo para o Consultor
+                        </button>
+                        <p id="docxOrientation" class="docx-orientation-msg" style="display:none;">
+                            ✅ <strong>Arquivo gerado!</strong> Por favor, envie o documento baixado para o e-mail ou WhatsApp do consultor responsável para que a análise estratégica seja iniciada.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-bar">
+                <!-- Botões da barra de ação permanecem aqui abaixo... -->
+                <button id="btnAiIA" class="btn-ai" onclick="generateAdvice()" style="display:none;">💡 Gerar Plano de Ação (IA)</button>
+                <button id="btnGenerateDocx" class="btn-docx" onclick="generateDocxAndSend()" style="display:none;">📄 Gerar Arquivo DOCX</button>
+                <button class="btn-backup" onclick="backupData()">💾 Backup</button>
+                <!-- etc... -->
+            </div>
+        </div>
                 </div>
             </div>
 

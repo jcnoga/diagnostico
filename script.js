@@ -994,3 +994,87 @@ async function generateDocxAndSend() {
 }	
 	
 }
+
+// Função para gerar o arquivo DOCX focado no envio ao consultor
+async function generateDocxForConsultant() {
+    // 1. Verificar se existem dados
+    const data = currentUser.diagnosisData;
+    if (!data || Object.keys(data).length === 0) {
+        alert("Não há dados preenchidos para gerar o arquivo.");
+        return;
+    }
+
+    showLoading();
+
+    try {
+        const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+
+        // 2. Criar estrutura do documento
+        const children = [
+            new Paragraph({
+                text: "DIAGNÓSTICO EMPRESARIAL - ENVIO PARA CONSULTORIA",
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({
+                children: [
+                    new TextRun({ text: `Empresa: ${data.empresa_nome || "Não informada"}`, bold: true, size: 28 }),
+                    new TextRun({ text: `\nData de Geração: ${new Date().toLocaleDateString()}`, break: 1 }),
+                    new TextRun({ text: `\nUsuário Responsável: ${currentUser.name}`, break: 1 }),
+                ],
+                spacing: { after: 400 }
+            })
+        ];
+
+        // 3. Mapear e agrupar respostas por categorias
+        // Itera sobre as etapas para manter a ordem do formulário
+        steps.forEach(step => {
+            const stepTitle = step.querySelector('.step-header h2').innerText;
+            children.push(new Paragraph({
+                text: stepTitle,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 400, after: 200 }
+            }));
+
+            const inputs = step.querySelectorAll("input, select, textarea");
+            let processedNames = [];
+
+            inputs.forEach(input => {
+                if (input.type === "submit" || input.type === "button" || processedNames.includes(input.name)) return;
+                
+                let val = data[input.name];
+                if (!val) return;
+
+                let labelText = input.name;
+                if (input.closest('.form-group')) {
+                    const label = input.closest('.form-group').querySelector('label');
+                    if (label) labelText = label.innerText.split('?')[0].replace('*', '').trim();
+                }
+
+                children.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: `${labelText}: `, bold: true }),
+                        new TextRun({ text: `${val}` })
+                    ],
+                    spacing: { after: 100 }
+                }));
+                processedNames.push(input.name);
+            });
+        });
+
+        // 4. Finalizar e Baixar
+        const doc = new Document({ sections: [{ children }] });
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `Diagnostico_${data.empresa_nome || 'Empresa'}_Consultoria.docx`);
+
+        // 5. Exibir orientação clara conforme solicitado
+        document.getElementById('docxOrientation').style.display = 'block';
+        alert("Arquivo gerado com sucesso! Siga as instruções na tela para o envio ao consultor.");
+
+    } catch (error) {
+        console.error("Erro na geração do DOCX:", error);
+        alert("Ocorreu um erro ao gerar o arquivo. Tente novamente.");
+    } finally {
+        hideLoading();
+    }
+}
