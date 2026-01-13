@@ -351,21 +351,24 @@ function proceedToApp() {
 
     updateDaysBadge();
     
+    // Carregar dados salvos no Firestore para o formulário
     if (currentUser.diagnosisData) {
         loadFormDataFromObject(currentUser.diagnosisData);
     }
 
-    // --- REGRA DE VISIBILIDADE CONDICIONAL ---
-    const btnAi = document.getElementById('btnAiIA');
-    const btnDocx = document.getElementById('btnGenerateDocx');
-    const emailAdmin = 'jcnvap@gmail.com';
+    // Regra 7: Botão IA visível para todos
+    const btnAi = document.querySelector('.btn-ai');
+    btnAi.style.display = 'inline-flex';
+}
 
-    if (currentUser.email === emailAdmin) {
-        btnAi.style.display = 'inline-flex';
-        btnDocx.style.display = 'none';
+function handleLogout() {
+    if(auth) {
+        auth.signOut().then(() => {
+            fecharApp(); // Garante limpeza ao sair
+            location.reload();
+        });
     } else {
-        btnAi.style.display = 'none';
-        btnDocx.style.display = 'inline-flex';
+        location.reload();
     }
 }
 
@@ -916,81 +919,4 @@ async function fillDemoData() {
     // 4. Salva no Firebase
     await saveToFirebase();
     alert("Dados de teste preenchidos com sucesso!");
-	
-async function generateDocxAndSend() {
-    showLoading();
-    const data = currentUser.diagnosisData || {};
-    
-    try {
-        const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
-
-        // 1. Criar o documento
-        const doc = new Document({
-            sections: [{
-                properties: {},
-                children: [
-                    new Paragraph({
-                        text: "DIAGNÓSTICO EMPRESARIAL - CONSULTORIA",
-                        heading: HeadingLevel.HEADING_1,
-                        alignment: AlignmentType.CENTER,
-                    }),
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: `Empresa: ${data.empresa_nome || "Não informada"}`, bold: true }),
-                            new TextRun({ text: `\nResponsável: ${currentUser.name}`, break: 1 }),
-                            new TextRun({ text: `\nData: ${new Date().toLocaleDateString()}`, break: 1 }),
-                        ],
-                    }),
-                    new Paragraph({ text: "", break: 1 }),
-                ],
-            }],
-        });
-
-        // 2. Adicionar os dados do diagnóstico dinamicamente
-        const sections = [
-            { title: "Dados Gerais", keys: ["empresa_cnpj", "empresa_segmento", "empresa_faturamento", "empresa_regime"] },
-            { title: "Financeiro", keys: ["fin_controle", "fin_custos_fixos", "fin_dividas"] },
-            { title: "Comercial e Vendas", keys: ["vendas_canais_aquisicao", "vendas_metas", "atend_canais"] },
-            { title: "Objetivos", keys: ["obj_problemas", "obj_principal", "obj_metas"] }
-        ];
-
-        sections.forEach(sec => {
-            doc.sections[0].children.push(new Paragraph({ text: sec.title, heading: HeadingLevel.HEADING_2, break: 1 }));
-            sec.keys.forEach(key => {
-                const label = key.replace(/_/g, " ").toUpperCase();
-                const value = data[key] || "N/A";
-                doc.sections[0].children.push(new Paragraph({
-                    children: [
-                        new TextRun({ text: `${label}: `, bold: true }),
-                        new TextRun(value)
-                    ]
-                }));
-            });
-        });
-
-        // 3. Gerar Blob e Download
-        const blob = await Packer.toBlob(doc);
-        saveAs(blob, `Diagnostico_${data.empresa_nome || "Empresa"}.docx`);
-
-        // 4. ENVIO AUTOMÁTICO (Notificação via Firestore)
-        // Como o app é cliente-side, registramos o envio no banco para o consultor
-        await db.collection("consultant_submissions").add({
-            userId: currentUser.uid,
-            userName: currentUser.name,
-            userEmail: currentUser.email,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            status: "Aguardando Análise",
-            empresa: data.empresa_nome || "N/A"
-        });
-
-        alert("Arquivo DOCX gerado com sucesso! Uma cópia foi enviada automaticamente para análise do consultor.");
-
-    } catch (error) {
-        console.error("Erro ao gerar DOCX:", error);
-        alert("Erro ao processar o arquivo. Certifique-se de preencher os dados básicos.");
-    } finally {
-        hideLoading();
-    }
-}	
-	
 }

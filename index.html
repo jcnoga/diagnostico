@@ -9,10 +9,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-	<!-- NOVAS BIBLIOTECAS PARA GERAR DOCX -->
-	
-<script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
     <!-- Link para o arquivo CSS -->
     <link rel="stylesheet" href="style.css">
@@ -76,19 +72,6 @@
                     <a onclick="switchAuthView('loginView')">Voltar ao Login</a>
                 </div>
             </div>
-			
-			
-			<div class="action-bar">
-    <!-- Botão de IA (Agora com ID para controle de visibilidade) -->
-    <button id="btnAiIA" class="btn-ai" onclick="generateAdvice()" style="display:none;">💡 Gerar Plano de Ação (IA)</button>
-    
-    <!-- NOVO Botão DOCX (Oculto por padrão) -->
-    <button id="btnGenerateDocx" class="btn-docx" onclick="generateDocxAndSend()" style="display:none;">📄 Gerar Arquivo DOCX</button>
-
-    <button class="btn-backup" onclick="backupData()">💾 Backup</button>
-	
-    <!-- ... (manter demais botões) ... -->
-</div>
 
         </div>
     </section>
