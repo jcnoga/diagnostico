@@ -1,3 +1,4 @@
+// --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyB30QPE40atu__s4z3WlDBXHaryIE6asfE",
     authDomain: "consultor-3016e.firebaseapp.com",
@@ -12,11 +13,8 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// --- LÓGICA DA APLICAÇÃO ---
-const email = emailInput.value.trim();
-const password = passwordInput.value.trim();
-
-
+// --- SELEÇÃO DE ELEMENTOS DO DOM (Mover para o TOPO) ---
+// Isso corrige o erro de "initialization"
 const app = document.getElementById('app');
 const loginSection = document.getElementById('login-section');
 const loginForm = document.getElementById('login-form');
@@ -37,7 +35,7 @@ const exportExcelMonthlyBtn = document.getElementById('export-excel-monthly');
 const recalculateAllBtn = document.getElementById('recalculate-all');
 const saveSettingsBtn = document.getElementById('save-settings');
 const allowManualEditCheckbox = document.getElementById('allow-manual-edit');
-const btnResetPopulateDemo = document.getElementById('btn-reset-populate-demo'); // Botão Reset+Simulação
+const btnResetPopulateDemo = document.getElementById('btn-reset-populate-demo');
 
 // Botões de Relatório
 const btnFullReport = document.getElementById('btn-full-report');
@@ -49,7 +47,7 @@ const btnExportEvolution = document.getElementById('btn-export-evolution');
 const btnExportGlossary = document.getElementById('btn-export-glossary');
 const btnExportConsultant = document.getElementById('btn-export-consultant');
 
-// Botões XLSX (Novos)
+// Botões XLSX
 const btnExportCompanyXLSX = document.getElementById('btn-export-company-xlsx');
 const btnImportCompanyXLSX = document.getElementById('btn-import-company-xlsx');
 const btnExportDailyXLSX = document.getElementById('btn-export-daily-xlsx');
@@ -91,7 +89,8 @@ const daysLeftText = document.getElementById('days-left-text');
 const monthlyFieldInfoBox = document.getElementById('monthly-field-info');
 const monthlyFieldText = document.getElementById('monthly-field-text');
 
-// --- ESTADO DA APLICAÇÃO ---
+
+// --- VARIÁVEIS DE ESTADO E CONSTANTES ---
 let currentUser = null;
 let currentYear = new Date().getFullYear();
 let financialData = {};
@@ -172,12 +171,14 @@ async function handleAuthStateChange(user) {
 function handleLogin(e) { 
     e.preventDefault(); 
     
-    // CORREÇÃO: Evita que o login seja processado se o formulário estiver oculto (ex: usuário tentando cadastrar)
+    // Agora loginForm já foi definido nas constantes lá em cima
     if (loginForm.style.display === 'none') return;
 
+    // Correção: pegar o valor aqui dentro, não fora
     const email = document.getElementById('login-user').value; 
     const pass = document.getElementById('login-password').value; 
     const errorEl = document.getElementById('login-error'); 
+    
     errorEl.textContent = ''; 
     auth.signInWithEmailAndPassword(email, pass).catch(error => { errorEl.textContent = "Email ou senha inválidos."; }); 
 }
@@ -480,23 +481,18 @@ async function checkAccessStatus() {
 }
 
 function lockAllTabs() {
-    // Lista de abas que DEVEM permanecer visíveis quando o crédito for 0.
-    // Inclui 'entradas-diarias' para garantir acesso a novos usuários.
     const allowedTabs = ['diagnostico', 'entradas-diarias', 'entradas-mensais', 'configuracoes'];
     
     const allTabs = document.querySelectorAll('nav button');
     
     allTabs.forEach(tab => {
         if(allowedTabs.includes(tab.dataset.tab)) {
-            // Remove a classe hidden-tab para garantir que seja exibida
             tab.classList.remove('hidden-tab');
         } else {
-            // Adiciona a classe hidden-tab para ocultar as demais abas
             tab.classList.add('hidden-tab');
         }
     });
 
-    // Lógica existente de controle do botão de desbloqueio
     if(btnGenerateUnlockCode) {
         btnGenerateUnlockCode.disabled = false;
         btnGenerateUnlockCode.style.backgroundColor = '#d4ac0d';
@@ -608,51 +604,41 @@ btnResetAuth.addEventListener('click', resetAccess);
 
 // === FUNÇÕES DE DADOS DE DEMONSTRAÇÃO E RESET ===
 
-// Função Auxiliar para Geração de Dados Diários Proporcionais
 function generateDailySimulation(year, monthIndex, totals) {
-    // Determina quantos dias exatos tem naquele mês/ano (trata bissextos)
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
     const entries = [];
     
-    // Saldos restantes para distribuir (Garante coerência com o total mensal)
     let remFat = totals.faturamento;
-    let remCustos = totals.custosVariaveis; // Mapeia para 'Comissão' no diário
+    let remCustos = totals.custosVariaveis; 
     let remDesp = totals.despesasOperacionais;
     let remVendas = totals.numeroDeVendas;
 
     for (let day = 1; day <= daysInMonth; day++) {
         const isLastDay = day === daysInMonth;
-        // Formato de data compatível com input type="date"
         const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
         let dFat, dCustos, dDesp, dVendas;
 
         if (isLastDay) {
-            // No último dia, lançamos exatamente o que sobrou para zerar a diferença (Matemática Exata)
             dFat = parseFloat(remFat.toFixed(2));
             dCustos = parseFloat(remCustos.toFixed(2));
             dDesp = parseFloat(remDesp.toFixed(2));
             dVendas = Math.round(remVendas);
         } else {
-            // Distribuição Proporcional com leve variância (Simula realidade de comércio)
-            // Variância entre 0.6x e 1.4x da média diária
             const variance = 0.6 + Math.random() * 0.8; 
             const daysLeft = (daysInMonth - day + 1);
 
-            // Calcula a fatia do dia baseada no saldo restante dividido pelos dias que faltam
             dFat = parseFloat(((remFat / daysLeft) * variance).toFixed(2));
             dCustos = parseFloat(((remCustos / daysLeft) * variance).toFixed(2));
             dDesp = parseFloat(((remDesp / daysLeft) * variance).toFixed(2));
             dVendas = Math.round((remVendas / daysLeft) * variance);
         }
 
-        // Proteção contra valores negativos (caso a variância seja muito agressiva em saldos baixos)
         dFat = Math.max(0, dFat);
         dCustos = Math.max(0, dCustos);
         dDesp = Math.max(0, dDesp);
         dVendas = Math.max(0, dVendas);
 
-        // Atualiza saldos para o próximo dia
         remFat -= dFat;
         remCustos -= dCustos;
         remDesp -= dDesp;
@@ -663,7 +649,7 @@ function generateDailySimulation(year, monthIndex, totals) {
             faturamento: dFat,
             despesas: dDesp,
             comissao: dCustos, 
-            outras: 0, // Campo 'Outras' zerado na simulação padrão
+            outras: 0,
             vendas: dVendas
         });
     }
@@ -680,7 +666,6 @@ async function handleResetAndPopulateDemoData() {
 
     if (!confirmed) return;
 
-    // 1. Reset & Configurar Aba Empresa (Lógica Inalterada)
     const demoCompanyData = {
         corporateName: "Loja Modelo de Exemplo Ltda",
         cnpj: "12.345.678/0001-90",
@@ -696,7 +681,6 @@ async function handleResetAndPopulateDemoData() {
         observations: "Dados gerados automaticamente para demonstração do sistema. Faturamento médio de R$ 60k com distribuição diária proporcional."
     };
     
-    // Atualizar userSettings local e na UI (Lógica Inalterada)
     userSettings = { ...userSettings, ...demoCompanyData, allowManualEdit: true };
     document.getElementById('diag-corporate-name').value = demoCompanyData.corporateName;
     document.getElementById('diag-cnpj').value = demoCompanyData.cnpj;
@@ -707,22 +691,17 @@ async function handleResetAndPopulateDemoData() {
     document.getElementById('diag-observations').value = demoCompanyData.observations;
     companyNameEl.textContent = demoCompanyData.corporateName;
 
-    // 2. Reset & Preencher Entradas Mensais E Diárias
     if (!financialData[currentYear]) financialData[currentYear] = {};
     
     for (let i = 0; i < 12; i++) {
-        // Simulação Mensal: Variação aleatória de +/- 10% em torno de 60k
         const variation = 1 + (Math.random() * 0.2 - 0.1); 
         const baseRevenue = 60000 * variation;
         
-        // Definição dos Totais Mensais
         const monthFaturamento = parseFloat(baseRevenue.toFixed(2));
         const monthNumVendas = Math.floor(300 * variation);
         const monthCustosVar = parseFloat((baseRevenue * 0.45).toFixed(2)); // ~45%
         const monthDespesasOp = parseFloat((3000 + (Math.random() * 500)).toFixed(2));
 
-        // --- Geração dos Lançamentos Diários ---
-        // Chama a função auxiliar para distribuir o total mensal pelos dias do mês
         const generatedDailyEntries = generateDailySimulation(currentYear, i, {
             faturamento: monthFaturamento,
             custosVariaveis: monthCustosVar,
@@ -738,21 +717,19 @@ async function handleResetAndPopulateDemoData() {
             despesasOperacionais: monthDespesasOp,
             depreciacao: 500,
             outrasReceitasDespesas: 0,
-            investimentos: i === 5 ? 5000 : 0, // Exemplo pontual
+            investimentos: i === 5 ? 5000 : 0, 
             financiamentosEntradas: 0,
             amortizacaoDividas: 0,
             aporteSocios: 0,
             distribuicaoLucros: 0,
-            impostos: parseFloat((baseRevenue * 0.08).toFixed(2)), // ~8% Simples
+            impostos: parseFloat((baseRevenue * 0.08).toFixed(2)), 
             
-            // Array preenchido com dados proporcionais
             dailyEntries: generatedDailyEntries 
         };
 
         financialData[currentYear][i] = monthlyData;
     }
 
-    // 3. Finalização e Salvamento
     allowManualEditCheckbox.checked = true;
 
     try {
@@ -761,7 +738,6 @@ async function handleResetAndPopulateDemoData() {
         
         updateAllCalculations(); 
         
-        // Força a renderização da tabela diária para o mês selecionado atualmente
         const selectedMonth = parseInt(dailyMonthSelector.value) || 0;
         renderDailyEntries(currentYear, selectedMonth);
 
@@ -850,7 +826,6 @@ function importLocalBackup(e) {
 
 // === FUNÇÕES XLSX ===
 
-// Helper para criar planilha
 function createSheetFromData(data, headers, sheetName) {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     const wb = XLSX.utils.book_new();
@@ -858,7 +833,6 @@ function createSheetFromData(data, headers, sheetName) {
     return wb;
 }
 
-// Helper para ler arquivo Excel
 function readXLSXFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -872,7 +846,6 @@ function readXLSXFile(file) {
     });
 }
 
-// -- Aba Empresa --
 function handleExportCompanyXLSX() {
     const formMap = {
         'Razão Social': userSettings.corporateName,
@@ -940,7 +913,7 @@ async function handleImportCompanyXLSX(e) {
         });
 
         if (updated) {
-            saveDiagnosisData(null); // Salva no Firebase
+            saveDiagnosisData(null); 
             alert('Dados da empresa importados com sucesso!');
         }
     } catch (err) {
@@ -950,7 +923,6 @@ async function handleImportCompanyXLSX(e) {
     e.target.value = '';
 }
 
-// -- Aba Entradas Diárias --
 function handleExportDailyXLSX() {
     const month = parseInt(dailyMonthSelector.value);
     const yearData = financialData[currentYear] || {};
@@ -978,7 +950,7 @@ async function handleImportDailyXLSX(e) {
     try {
         const wb = await readXLSXFile(file);
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws); // Objects based on header
+        const data = XLSX.utils.sheet_to_json(ws); 
 
         const month = parseInt(dailyMonthSelector.value);
         if (!financialData[currentYear]) financialData[currentYear] = {};
@@ -986,7 +958,6 @@ async function handleImportDailyXLSX(e) {
 
         let addedCount = 0;
         data.forEach(row => {
-            // Mapping assumptions based on Export headers
             const date = row['Data'] || row['date'];
             if (date) {
                 financialData[currentYear][month].dailyEntries.push({
@@ -1017,7 +988,6 @@ async function handleImportDailyXLSX(e) {
     e.target.value = '';
 }
 
-// -- Aba Entradas Mensais --
 function handleExportMonthlyXLSX() {
     const yearData = financialData[currentYear] || {};
     const headers = ['Mês', 'Faturamento', 'NumVendas', 'CustosVariaveis', 'CustosFixos', 'DespesasOp', 'Depreciacao', 'Outras', 'Investimentos', 'FinancEntradas', 'AmortDividas', 'AporteSocios', 'DistrLucros', 'Impostos'];
@@ -1052,7 +1022,6 @@ async function handleImportMonthlyXLSX(e) {
 
         if (!financialData[currentYear]) financialData[currentYear] = {};
         
-        // Map Excel headers to JSON keys
         const mapKeys = {
             'Faturamento': 'faturamento', 'NumVendas': 'numeroDeVendas', 'CustosVariaveis': 'custosVariaveis',
             'CustosFixos': 'custosFixos', 'DespesasOp': 'despesasOperacionais', 'Depreciacao': 'depreciacao',
@@ -1062,7 +1031,7 @@ async function handleImportMonthlyXLSX(e) {
         };
 
         data.forEach((row, idx) => {
-            if (idx < 12) { // 12 months
+            if (idx < 12) { 
                 if (!financialData[currentYear][idx]) financialData[currentYear][idx] = { dailyEntries: [] };
                 Object.keys(mapKeys).forEach(header => {
                     if (row[header] !== undefined) {
@@ -1083,7 +1052,6 @@ async function handleImportMonthlyXLSX(e) {
     e.target.value = '';
 }
 
-// -- Exportação apenas (Indicadores/Evolução) --
 function handleExportAnnualXLSX() {
     const tableData = [];
     const yearData = financialData[currentYear] || {};
@@ -1301,10 +1269,11 @@ function generateConsultantDiagnosisPDF() {
     doc.setTextColor(0, 95, 115);
     doc.text(`Parecer do Consultor - ${currentYear}`, 14, 20);
     
+    let currentY = 30;
     doc.setFontSize(11);
     doc.setTextColor(0);
     const diagnosisText = userSettings.consultantDiagnosis || "Nenhum diagnóstico registrado.";
-    const splitDiagnosis = doc.splitTextToSize(diagnosisText, pageWidth - 28);
+    const splitDiagnosis = doc.splitTextToSize(diagnosisText, 180); // Adjusted width
     doc.text(splitDiagnosis, 14, currentY);
 
     doc.save(`Parecer_Consultor_${currentYear}.pdf`);
