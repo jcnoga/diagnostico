@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diagnóstico Empresarial - Firebase Real</title>
     
-    <!-- FIREBASE SDKs (Versão COMPAT - Necessária para script simples sem módulos) -->
+    <!-- FIREBASE SDKs (Versão COMPAT) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -13,7 +13,7 @@
     <!-- Link para o arquivo CSS -->
     <link rel="stylesheet" href="style.css">
     
-    <!-- Script Principal com defer para carregar após o HTML -->
+    <!-- Script Principal com defer -->
     <script src="script.js" defer></script>
 </head>
 <body>
@@ -21,13 +21,12 @@
     <!-- OVERLAY DE CARREGAMENTO -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
+        <div style="color: white; margin-top: 15px; font-weight: bold; text-align: center;" id="loadingText">Carregando...</div>
     </div>
 
     <!-- TELA DE AUTENTICAÇÃO -->
     <section id="authScreen">
         <div class="auth-card">
-            
-            <!-- View: Login -->
             <div id="loginView" class="auth-view active">
                 <h2>Bem-vindo</h2>
                 <p>Faça login com Firebase para acessar o diagnóstico.</p>
@@ -45,7 +44,6 @@
                 </div>
             </div>
 
-            <!-- View: Cadastro -->
             <div id="registerView" class="auth-view">
                 <h2>Criar Conta Firebase</h2>
                 <p>Preencha seus dados para começar. Você ganhará 30 dias de acesso gratuito.</p>
@@ -60,7 +58,6 @@
                 </div>
             </div>
 
-            <!-- View: Esqueci Senha -->
             <div id="forgotView" class="auth-view">
                 <h2>Recuperar Senha</h2>
                 <p>Informe seu e-mail para receber um link de redefinição.</p>
@@ -74,7 +71,6 @@
                     <a onclick="switchAuthView('loginView')">Voltar ao Login</a>
                 </div>
             </div>
-
         </div>
     </section>
 
@@ -640,7 +636,7 @@
             <div class="nav-buttons">
                 <button type="button" class="btn-prev" id="prevBtn" onclick="nextPrev(-1)">Voltar</button>
                 <button type="button" class="btn-next" id="nextBtn" onclick="nextPrev(1)">Próximo</button>
-                <button type="button" class="btn-submit" id="submitBtn" onclick="generateReport()" style="display:none;">Gerar Diagnóstico</button>
+                <button type="button" class="btn-submit" id="submitBtn" onclick="generateReport()" style="display:none;">Gerar Diagnóstico e Enviar</button>
             </div>
         </form>
 

@@ -154,8 +154,14 @@ const reportUserSpan = document.getElementById('reportUser');
 const lockScreen = document.getElementById('lockScreen');
 const loadingOverlay = document.getElementById('loadingOverlay');
 
-function showLoading() { loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
+function showLoading(msg) { 
+    if(msg) document.getElementById('loadingText').textContent = msg;
+    loadingOverlay.style.display = 'flex'; 
+}
+function hideLoading() { 
+    loadingOverlay.style.display = 'none'; 
+    document.getElementById('loadingText').textContent = 'Carregando...';
+}
 
 // --- AUTH LOGIC ---
 
@@ -511,7 +517,7 @@ function toggleAdsDetail(val) { document.getElementById('adsDetails').style.disp
 function toggleMktpDetail(val) { document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
 
 // --- RELATÓRIO E IA ---
-function generateReport() {
+async function generateReport() {
     document.getElementById("diagnosisForm").style.display = "none";
     document.querySelector('.nav-buttons').style.display = 'none';
     document.getElementById("reportSection").style.display = "block";
@@ -519,7 +525,11 @@ function generateReport() {
     const now = new Date();
     document.getElementById("reportDate").innerText = now.toLocaleDateString() + " às " + now.toLocaleTimeString();
     
+    // 1. Gera o HTML visual
     let html = "";
+    // Armazena os dados para envio
+    let dataToSend = { ...currentUser.diagnosisData };
+
     steps.forEach((step) => {
         const title = step.querySelector('.step-header h2').innerText;
         html += `<div class="report-block"><h3>${title}</h3>`;
@@ -546,6 +556,9 @@ function generateReport() {
                  val = input.options[input.selectedIndex].text;
             }
 
+            // Atualiza objeto de envio com valores frescos do DOM
+            if(input.name) dataToSend[input.name] = val;
+
             if(val) {
                  html += `<div class="report-item"><strong>${labelText}</strong><span>${val}</span></div>`;
                  processedNames.push(input.name);
@@ -554,6 +567,52 @@ function generateReport() {
         html += `</div>`;
     });
     document.getElementById("reportContent").innerHTML = html;
+
+    // 2. Envia para o email automaticamente
+    await sendDiagnosisToEmail(dataToSend);
+}
+
+// --- FUNÇÃO DE ENVIO DE EMAIL ---
+async function sendDiagnosisToEmail(data) {
+    const submitBtn = document.getElementById("submitBtn");
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = "Enviando...";
+    submitBtn.disabled = true;
+
+    // FormSubmit Endpoint
+    const url = "https://formsubmit.co/ajax/websitelogx@gmail.com";
+    
+    // Adiciona metadados para o email
+    const payload = {
+        _subject: "Novo Diagnóstico - " + (data.s1_identificacao || "Cliente"),
+        _template: "table", // Formato tabela
+        _captcha: "false",  // Desativa captcha
+        ...data // Espalha os dados do formulário
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            alert("Diagnóstico gerado e enviado para websitelogx@gmail.com com sucesso!");
+        } else {
+            console.error("Erro no envio:", response.statusText);
+            alert("Diagnóstico gerado, mas houve um erro ao enviar o email automático.");
+        }
+    } catch (error) {
+        console.error("Erro de rede:", error);
+        alert("Diagnóstico gerado. Erro de conexão ao enviar email.");
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
 }
 
 function editForm() {
@@ -567,15 +626,13 @@ function editForm() {
 
 // --- LÓGICA DE IA / PLANO DE AÇÃO ---
 async function generateAdvice() {
-    showLoading();
+    showLoading("Analisando com IA...");
     await new Promise(r => setTimeout(r, 1500)); 
     
     const data = currentUser.diagnosisData || {};
     
-    // Extração de dados com os NOVOS nomes dos campos
     const nomeEmpresa = data.s1_identificacao || "Sua Empresa";
     const segmento = (data.s1_segmento || "").toLowerCase();
-    const faturamento = parseFloat(data.s1_faturamento || 0);
     const controleCustos = data.s2_controle_custos || "";
     const investeAds = data.s9_investe_ads;
     
@@ -588,7 +645,6 @@ async function generateAdvice() {
         Com base nas 15 áreas analisadas, aqui estão as recomendações prioritárias:
     </div>`;
 
-    // 1. Financeiro
     let finAdvice = `<h4>1. Gestão Financeira e Custos</h4><ul>`;
     if(!controleCustos.toLowerCase().includes("erp") && !controleCustos.toLowerCase().includes("software")) {
         finAdvice += `<li><strong>Profissionalização:</strong> Você mencionou não usar ERP robusto. Migrar de planilhas para um sistema como Bling ou Tiny reduzirá erros em até 40%.</li>`;
@@ -599,7 +655,6 @@ async function generateAdvice() {
     finAdvice += `</ul>`;
     html += `<div class="advice-card">${finAdvice}</div>`;
 
-    // 2. Vendas e Marketing
     let mktAdvice = `<h4>2. Aceleração de Vendas</h4><ul>`;
     if(investeAds === "Nao") {
         mktAdvice += `<li><strong>Tráfego Pago:</strong> O alcance orgânico é limitado. Inicie testes com verba pequena (R$ 10/dia) no Meta Ads para atrair público local.</li>`;
@@ -610,7 +665,6 @@ async function generateAdvice() {
     mktAdvice += `</ul>`;
     html += `<div class="advice-card">${mktAdvice}</div>`;
 
-    // 3. Estratégico
     let stratAdvice = `<h4>3. Estratégia e Processos</h4><ul>`;
     if(data.s13_pop === "Nao") {
         stratAdvice += `<li><strong>Documentação (POP):</strong> Para escalar, você precisa de processos. Comece documentando a tarefa mais repetitiva da empresa.</li>`;
@@ -788,5 +842,5 @@ async function fillDemoData() {
     if (typeof toggleMktpDetail === 'function') toggleMktpDetail(demoData.s12_vende_mktp);
 
     await saveToFirebase();
-    alert("Dados de teste (novos campos) preenchidos!");
+    alert("Dados de teste preenchidos!");
 }
