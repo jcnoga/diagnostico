@@ -18,6 +18,7 @@ if (window.location.protocol === 'file:') {
 }
 
 // --- 1. CONFIGURAÇÃO DO FIREBASE ---
+// ATENÇÃO: NÃO use 'import' ou 'export' aqui. Mantenha o objeto const simples.
 const firebaseConfig = {
   apiKey: "AIzaSyAp7z_Jof1hQdA1YPZcyXFCHk6vXaQ1jlM",
   authDomain: "diagnostico-a2247.firebaseapp.com",
@@ -26,7 +27,7 @@ const firebaseConfig = {
   messagingSenderId: "125978207628",
   appId: "1:125978207628:web:f5135603051550de1fe2a9",
   measurementId: "G-6R39CB3R52"
-}
+};
 
 // --- GESTÃO DE ESTADOS E SEGURANÇA (NOVAS VARIÁVEIS) ---
 window.unsubscribeListeners = [];
