@@ -144,55 +144,38 @@
     <div class="container">
         <!-- FORMULÁRIO -->
         <form id="diagnosisForm">
-            <!-- Etapa 1: Dados Gerais -->
+            
+            <!-- 1. Dados Gerais da Empresa -->
             <div class="step active" data-title="Dados Gerais">
                 <div class="step-header">
                     <h2>1. Dados Gerais da Empresa</h2>
                     <button type="button" class="btn-demo" onclick="fillDemoData()">🧪 Preencher Teste</button>
                 </div>
                 <div class="form-group">
-                    <label>Nome da Empresa * 
-                        <span class="help-icon">?<span class="help-tooltip">Nome fantasia ou Razão Social da empresa. Ex: Padaria Pão Quente Ltda.</span></span>
-                    </label>
-                    <input type="text" name="empresa_nome" required>
+                    <label>Qual é o nome da empresa e o CNPJ? *</label>
+                    <input type="text" name="s1_identificacao" placeholder="Ex: Minha Loja Ltda - 00.000.000/0001-00" required>
                 </div>
                 <div class="form-group">
-                    <label>CNPJ
-                        <span class="help-icon">?<span class="help-tooltip">Cadastro Nacional da Pessoa Jurídica. Formato: 00.000.000/0000-00.</span></span>
-                    </label>
-                    <input type="text" name="empresa_cnpj" placeholder="00.000.000/0000-00">
+                    <label>Qual é o segmento de atuação principal? *</label>
+                    <input type="text" name="s1_segmento" placeholder="Ex: Varejo de Moda, Serviços de TI..." required>
                 </div>
                 <div class="form-group">
-                    <label>Segmento / Atividade Principal *
-                        <span class="help-icon">?<span class="help-tooltip">Qual o ramo do seu negócio? Ex: Varejo de Roupas, Consultoria de TI, Restaurante.</span></span>
-                    </label>
-                    <input type="text" name="empresa_segmento" required>
+                    <label>Há quanto tempo a empresa está em operação?</label>
+                    <input type="text" name="s1_tempo_operacao" placeholder="Ex: 5 anos">
                 </div>
                 <div class="form-group">
-                    <label>Tempo de Atuação (anos)
-                        <span class="help-icon">?<span class="help-tooltip">Há quantos anos a empresa está ativa no mercado?</span></span>
-                    </label>
-                    <input type="number" name="empresa_tempo" min="0">
+                    <label>Quantos funcionários a empresa possui atualmente?</label>
+                    <input type="number" name="s1_funcionarios">
                 </div>
                 <div class="form-group">
-                    <label>Número de Funcionários
-                        <span class="help-icon">?<span class="help-tooltip">Total de colaboradores (CLT + PJ) que trabalham na operação.</span></span>
-                    </label>
-                    <input type="number" name="empresa_funcionarios" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Faturamento Médio Mensal
-                        <span class="help-icon">?<span class="help-tooltip">Média de vendas brutas dos últimos 6 meses.</span></span>
-                    </label>
+                    <label>Qual é o faturamento médio mensal?</label>
                     <div class="input-symbol-wrapper">
-                        <input type="number" name="empresa_faturamento" step="0.01">
+                        <input type="number" name="s1_faturamento" step="0.01">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Regime Tributário
-                        <span class="help-icon">?<span class="help-tooltip">Como sua empresa paga impostos? MEI, Simples Nacional, Lucro Presumido ou Real.</span></span>
-                    </label>
-                    <select name="empresa_regime">
+                    <label>Qual é o regime tributário adotado?</label>
+                    <select name="s1_regime">
                         <option value="">Selecione...</option>
                         <option value="MEI">MEI</option>
                         <option value="Simples Nacional">Simples Nacional</option>
@@ -201,569 +184,455 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Público-alvo Principal
-                        <span class="help-icon">?<span class="help-tooltip">B2C = Vende para pessoas físicas. B2B = Vende para outras empresas.</span></span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="empresa_publico" value="B2C"> Consumidor Final (B2C)</label>
-                        <label class="radio-option"><input type="radio" name="empresa_publico" value="B2B"> Empresas (B2B)</label>
-                        <label class="radio-option"><input type="radio" name="empresa_publico" value="Hibrido"> Ambos</label>
-                    </div>
+                    <label>Quem é o público-alvo principal?</label>
+                    <select name="s1_publico">
+                        <option value="B2C">B2C (Consumidor Final)</option>
+                        <option value="B2B">B2B (Empresas)</option>
+                        <option value="Ambos">Ambos</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Etapa 2: Financeiro e Custos -->
+            <!-- 2. Estrutura Financeira e Custos -->
             <div class="step" data-title="Financeiro">
-                <div class="step-header">
-                    <h2>2. Financeiro e Custos</h2>
+                <div class="step-header"><h2>2. Estrutura Financeira e Custos</h2></div>
+                <div class="form-group">
+                    <label>A empresa possui controle detalhado de custos? Como é realizado?</label>
+                    <textarea name="s2_controle_custos" placeholder="Ex: Sim, via software ERP ou Planilhas"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Possui controle de custos detalhado? 
-                        <span class="help-icon">?
-                            <span class="help-tooltip">A empresa registra cada centavo gasto? Ex: Planilhas completas ou Software de Gestão.</span>
-                        </span>
-                    </label>
-                    <select name="fin_controle">
-                        <option value="Nao">Não</option>
-                        <option value="Parcial">Parcialmente</option>
-                        <option value="Sim">Sim, total</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Custos Fixos Mensais (Estimativa)
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Custos que não mudam se vender mais ou menos. Ex: Aluguel, Salários, Internet.</span>
-                        </span>
-                    </label>
+                    <label>Quais são os custos fixos mensais (valor aproximado)?</label>
                     <div class="input-symbol-wrapper">
-                        <input type="number" name="fin_custos_fixos" step="0.01">
+                        <input type="number" name="s2_custos_fixos" step="0.01">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Custos Variáveis Principais
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Custos atrelados à venda. Ex: Matéria-prima, Taxa de cartão, Comissão.</span>
-                        </span>
-                    </label>
-                    <textarea name="fin_custos_variaveis" placeholder="Liste os principais..."></textarea>
+                    <label>Quais são os principais custos variáveis e seus percentuais?</label>
+                    <textarea name="s2_custos_variaveis" placeholder="Ex: Taxa cartão (3%), Comissão (5%)..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Existe controle de margem por produto/serviço?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Você sabe exatamente quanto lucra em cada item vendido, descontando todos os custos?</span>
-                        </span>
-                    </label>
+                    <label>Existe controle de margem de lucro por produto/categoria?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="fin_margem" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="fin_margem" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s2_margem_lucro" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s2_margem_lucro" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Conhece o Ponto de Equilíbrio?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O valor mínimo que a empresa precisa faturar para pagar todas as contas (Zero a Zero).</span>
-                        </span>
-                    </label>
+                    <label>A empresa conhece seu ponto de equilíbrio financeiro?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="fin_ponto_equilibrio" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="fin_ponto_equilibrio" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s2_ponto_equilibrio" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s2_ponto_equilibrio" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Possui Dívidas Atuais?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Empréstimos bancários, dívidas com fornecedores ou impostos atrasados.</span>
-                        </span>
-                    </label>
-                    <textarea name="fin_dividas" placeholder="Se sim, quais e valores aproximados..."></textarea>
+                    <label>Existem dívidas ativas? Quais valores e taxas?</label>
+                    <textarea name="s2_dividas" placeholder="Liste empréstimos, parcelamentos..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Realiza Fluxo de Caixa Projetado?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Previsão das entradas e saídas futuras para saber se faltará dinheiro no fim do mês.</span>
-                        </span>
-                    </label>
-                    <select name="fin_fluxo_caixa">
-                        <option value="Nao">Não</option>
+                    <label>A empresa realiza fluxo de caixa projetado?</label>
+                    <select name="s2_fluxo_caixa">
                         <option value="Sim">Sim</option>
+                        <option value="Nao">Não, apenas realizado</option>
+                        <option value="Nenhum">Não há controle</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Etapa 3: Precificação -->
+            <!-- 3. Precificação e Lucratividade -->
             <div class="step" data-title="Precificação">
-                <div class="step-header">
-                    <h2>3. Precificação e Lucratividade</h2>
+                <div class="step-header"><h2>3. Precificação e Lucratividade</h2></div>
+                <div class="form-group">
+                    <label>Qual metodologia é utilizada para definir os preços?</label>
+                    <textarea name="s3_metodologia"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Como os preços são definidos?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Ex: Multiplico custo por 2, copio o concorrente, uso markup técnico, etc.</span>
-                        </span>
-                    </label>
-                    <textarea name="prec_metodo"></textarea>
+                    <label>Os preços consideram custos, impostos e margem?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s3_considera_custos" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s3_considera_custos" value="Nao"> Não</label>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Produtos mais vendidos (Top 3)
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quais são os itens "Carro-Chefe" da empresa?</span>
-                        </span>
-                    </label>
-                    <input type="text" name="prec_top_vendas">
+                    <label>Quais são os três produtos mais vendidos atualmente?</label>
+                    <input type="text" name="s3_top_produtos">
                 </div>
                 <div class="form-group">
-                    <label>Produtos com menor margem/lucro
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Produtos que vendem mas deixam pouco dinheiro no caixa.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="prec_menor_lucro">
+                    <label>Quais produtos apresentam menor margem ou prejuízo?</label>
+                    <input type="text" name="s3_menor_margem">
                 </div>
                 <div class="form-group">
-                    <label>Ticket Médio (Valor médio por venda)
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Faturamento total dividido pelo número de vendas no período.</span>
-                        </span>
-                    </label>
+                    <label>Qual é o ticket médio por venda?</label>
                     <div class="input-symbol-wrapper">
-                        <input type="number" name="prec_ticket_medio" step="0.01">
+                        <input type="number" name="s3_ticket_medio" step="0.01">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Política de Descontos
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Regras para dar desconto. Ex: 10% à vista, 5% acima de R$500.</span>
-                        </span>
-                    </label>
-                    <textarea name="prec_descontos" placeholder="Como e quando são aplicados descontos?"></textarea>
+                    <label>Existe política formal de descontos? Impacta a margem?</label>
+                    <textarea name="s3_politica_descontos"></textarea>
                 </div>
             </div>
 
-            <!-- Etapa 4: Atendimento -->
+            <!-- 4. Atendimento e Experiência -->
             <div class="step" data-title="Atendimento">
-                <div class="step-header">
-                    <h2>4. Atendimento ao Cliente</h2>
+                <div class="step-header"><h2>4. Atendimento e Experiência do Cliente</h2></div>
+                <div class="form-group">
+                    <label>Quais canais de atendimento são utilizados?</label>
+                    <input type="text" name="s4_canais_atendimento">
                 </div>
                 <div class="form-group">
-                    <label>Canais de atendimento utilizados
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Por onde o cliente fala com você? WhatsApp, Fone, Email, Chat.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="atend_canais" placeholder="WhatsApp, Email, Telefone, Instagram...">
+                    <label>Qual é o tempo médio de resposta ao cliente?</label>
+                    <input type="text" name="s4_tempo_resposta">
                 </div>
                 <div class="form-group">
-                    <label>Tempo médio de resposta
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quanto tempo leva para o cliente ser respondido no primeiro contato?</span>
-                        </span>
-                    </label>
-                    <select name="atend_tempo">
-                        <option value="Imediato">Imediato</option>
-                        <option value="Ate 1h">Até 1 hora</option>
-                        <option value="Ate 24h">Até 24 horas</option>
-                        <option value="Mais de 24h">Mais de 24 horas</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Existe pós-venda estruturado?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Entrar em contato após a venda para verificar satisfação e oferecer novos produtos.</span>
-                        </span>
-                    </label>
+                    <label>Existe um processo estruturado de pós-venda?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="atend_posvenda" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="atend_posvenda" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s4_pos_venda" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s4_pos_venda" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Principais reclamações dos clientes
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O que o cliente mais reclama? Preço, demora, qualidade?</span>
-                        </span>
-                    </label>
-                    <textarea name="atend_reclamacoes"></textarea>
+                    <label>Quais são as principais reclamações dos clientes?</label>
+                    <textarea name="s4_reclamacoes"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Essas reclamações geram impacto financeiro?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s4_impacto_reclamacoes" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s4_impacto_reclamacoes" value="Nao"> Não</label>
+                    </div>
                 </div>
             </div>
 
-            <!-- Etapa 5: Vendas -->
+            <!-- 5. Vendas e Processo Comercial -->
             <div class="step" data-title="Vendas">
-                <div class="step-header">
-                    <h2>5. Vendas e Processo Comercial</h2>
+                <div class="step-header"><h2>5. Vendas e Processo Comercial</h2></div>
+                <div class="form-group">
+                    <label>Quais são os principais canais de aquisição de clientes?</label>
+                    <textarea name="s5_aquisicao"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Principais canais de aquisição de clientes
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Como os clientes chegam até você? (Indicação, Google, Instagram, Porta a porta).</span>
-                        </span>
-                    </label>
-                    <input type="text" name="vendas_canais_aquisicao">
-                </div>
-                <div class="form-group">
-                    <label>Funil de Vendas definido?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Etapas claras: Visitante -> Lead -> Oportunidade -> Negociação -> Venda.</span>
-                        </span>
-                    </label>
-                    <select name="vendas_funil">
-                        <option value="Nao">Não</option>
-                        <option value="Sim">Sim, etapas claras</option>
-                        <option value="Mais ou menos">Informalmente</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Possui metas de vendas definidas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Há um valor mensal alvo que todos conhecem? Ex: R$ 50k/mês.</span>
-                        </span>
-                    </label>
+                    <label>Existe um funil de vendas estruturado?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="vendas_metas" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="vendas_metas" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s5_funil" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s5_funil" value="Informal"> Processo informal</label>
+                        <label class="radio-option"><input type="radio" name="s5_funil" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Principais motivos de perda de vendas
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Por que o cliente desiste na hora H? Preço, Prazo, Atendimento...</span>
-                        </span>
-                    </label>
-                    <textarea name="vendas_perdas" placeholder="Ex: Preço, Prazo, Atendimento..."></textarea>
+                    <label>Há metas de vendas mensais definidas?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s5_metas" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s5_metas" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Como o desempenho comercial é acompanhado?</label>
+                    <input type="text" name="s5_acompanhamento">
+                </div>
+                <div class="form-group">
+                    <label>Quais são os principais motivos de perda de vendas?</label>
+                    <textarea name="s5_motivos_perda"></textarea>
                 </div>
             </div>
 
-            <!-- Etapa 6: Promoções -->
+            <!-- 6. Promoções e Campanhas -->
             <div class="step" data-title="Promoções">
-                <div class="step-header">
-                    <h2>6. Promoções e Campanhas</h2>
+                <div class="step-header"><h2>6. Promoções e Campanhas</h2></div>
+                <div class="form-group">
+                    <label>A empresa realiza promoções com que frequência?</label>
+                    <input type="text" name="s6_frequencia_promo">
                 </div>
                 <div class="form-group">
-                    <label>Realiza promoções com frequência?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Liquidações, Black Friday, Descontos sazonais.</span>
-                        </span>
-                    </label>
-                    <select name="promo_frequencia">
-                        <option value="Raramente">Raramente</option>
-                        <option value="Mensalmente">Mensalmente</option>
-                        <option value="Sazonalmente">Apenas datas sazonais</option>
-                        <option value="Sempre">Quase sempre</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Avalia o resultado (ROI) das campanhas?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Calcula quanto lucrou para cada real gasto na promoção?</span>
-                        </span>
-                    </label>
+                    <label>Existe planejamento financeiro para campanhas?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="promo_analise" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="promo_analise" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s6_planejamento" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s6_planejamento" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>O resultado das promoções é mensurado (ROI)?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s6_roi" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s6_roi" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Já houve campanhas que geraram prejuízo?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s6_prejuizo" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s6_prejuizo" value="Nao"> Não</label>
                     </div>
                 </div>
             </div>
 
-            <!-- Etapa 7: Marketing Digital -->
+            <!-- 7. Marketing Digital -->
             <div class="step" data-title="Mkt Digital">
-                <div class="step-header">
-                    <h2>7. Marketing Digital e Redes Sociais</h2>
+                <div class="step-header"><h2>7. Marketing Digital e Redes Sociais</h2></div>
+                <div class="form-group">
+                    <label>Quais redes sociais a empresa utiliza ativamente?</label>
+                    <input type="text" name="s7_redes_sociais">
                 </div>
                 <div class="form-group">
-                    <label>Redes Sociais ativas
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quais redes a empresa mantém atualizadas? Insta, Facebook, LinkedIn.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="mkt_redes" placeholder="Instagram, Facebook, LinkedIn, TikTok...">
+                    <label>Qual é a frequência média de postagens?</label>
+                    <input type="text" name="s7_frequencia_post">
                 </div>
                 <div class="form-group">
-                    <label>Frequência de postagens
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Quantas vezes por semana você posta conteúdo?</span>
-                        </span>
-                    </label>
-                    <input type="text" name="mkt_frequencia">
+                    <label>As redes sociais geram vendas diretas ou apenas engajamento?</label>
+                    <select name="s7_objetivo_redes">
+                        <option value="Vendas">Vendas Diretas</option>
+                        <option value="Engajamento">Apenas Engajamento</option>
+                        <option value="Ambos">Ambos</option>
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label>As redes sociais geram vendas diretas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O cliente vê o post e compra, ou a rede é apenas para "boniteza"?</span>
-                        </span>
-                    </label>
-                    <select name="mkt_converte">
-                        <option value="Nao">Não, só vitrine</option>
+                    <label>Existe acompanhamento de métricas (alcance, conversão)?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s7_metricas" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s7_metricas" value="Nao"> Não</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. Tráfego Orgânico -->
+            <div class="step" data-title="Tráfego Orgânico">
+                <div class="step-header"><h2>8. Tráfego Orgânico e Presença Online</h2></div>
+                <div class="form-group">
+                    <label>A empresa está cadastrada e ativa no Google Meu Negócio?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s8_gmn" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s8_gmn" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Existe produção de conteúdo (blog, vídeos)?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s8_conteudo" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s8_conteudo" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>A presença online contribui para vendas/tráfego físico?</label>
+                    <select name="s8_contribuicao_online">
+                        <option value="Sim">Sim</option>
                         <option value="Pouco">Pouco</option>
-                        <option value="Muito">Sim, é o principal canal</option>
+                        <option value="Nao">Não</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Etapa 8: Tráfego Orgânico -->
-            <div class="step" data-title="Orgânico">
-                <div class="step-header">
-                    <h2>8. Tráfego Orgânico e SEO</h2>
-                </div>
-                <div class="form-group">
-                    <label>A empresa aparece no Google (Meu Negócio)?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Se alguém buscar seu nome ou serviço na cidade, seu mapa aparece?</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="seo_gmn" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="seo_gmn" value="Nao"> Não</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Produz conteúdo (Blog/Youtube)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Marketing de conteúdo para atrair clientes sem pagar anúncio.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="seo_conteudo" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="seo_conteudo" value="Nao"> Não</label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Etapa 9: Tráfego Pago -->
+            <!-- 9. Tráfego Pago -->
             <div class="step" data-title="Tráfego Pago">
-                <div class="step-header">
-                    <h2>9. Tráfego Pago (Anúncios)</h2>
-                </div>
+                <div class="step-header"><h2>9. Tráfego Pago (Anúncios)</h2></div>
                 <div class="form-group">
-                    <label>Investe em anúncios pagos?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Google Ads, Facebook Ads, Instagram Ads (impulsionar).</span>
-                        </span>
-                    </label>
-                    <select name="ads_investe" onchange="toggleAdsDetail(this.value)">
+                    <label>A empresa investe em anúncios pagos atualmente?</label>
+                    <select name="s9_investe_ads" onchange="toggleAdsDetail(this.value)">
                         <option value="Nao">Não</option>
                         <option value="Sim">Sim</option>
                     </select>
                 </div>
                 <div id="adsDetails" style="display:none;">
                     <div class="form-group">
-                        <label>Plataformas (Google/Meta)
-                            <span class="help-icon">?
-                                <span class="help-tooltip">Onde você coloca dinheiro? Instagram, Google Search, Youtube?</span>
-                            </span>
-                        </label>
-                        <input type="text" name="ads_plataformas">
+                        <label>Quais plataformas são utilizadas?</label>
+                        <input type="text" name="s9_plataformas">
                     </div>
                     <div class="form-group">
-                        <label>Investimento Mensal Médio
-                            <span class="help-icon">?
-                                <span class="help-tooltip">Valor total gasto com as plataformas de anúncio.</span>
-                            </span>
-                        </label>
+                        <label>Qual é o investimento médio mensal?</label>
                         <div class="input-symbol-wrapper">
-                            <input type="number" name="ads_valor" step="0.01">
+                            <input type="number" name="s9_valor_investido" step="0.01">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Sabe o Custo por Lead/Venda?
-                             <span class="help-icon">?
-                                <span class="help-tooltip">Quanto custa cada cliente que entra em contato através do anúncio?</span>
-                            </span>
-                        </label>
+                        <label>Conhece o custo por lead/venda?</label>
                         <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="ads_cpl" value="Sim"> Sim</label>
-                            <label class="radio-option"><input type="radio" name="ads_cpl" value="Nao"> Não</label>
+                            <label class="radio-option"><input type="radio" name="s9_cpl" value="Sim"> Sim</label>
+                            <label class="radio-option"><input type="radio" name="s9_cpl" value="Nao"> Não</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Há controle de retorno financeiro (ROI)?</label>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="s9_roi_ads" value="Sim"> Sim</label>
+                            <label class="radio-option"><input type="radio" name="s9_roi_ads" value="Nao"> Não</label>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Etapa 10: Site -->
-            <div class="step" data-title="Site">
-                <div class="step-header">
-                    <h2>10. Site e Landing Pages</h2>
-                </div>
+            <!-- 10. Site e E-commerce -->
+            <div class="step" data-title="Site/E-com">
+                <div class="step-header"><h2>10. Site, E-commerce e Landing Pages</h2></div>
                 <div class="form-group">
-                    <label>Possui Site Institucional ou Loja?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Um domínio próprio (www.suaempresa.com.br).</span>
-                        </span>
-                    </label>
+                    <label>A empresa possui site institucional ou loja virtual?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="site_possui" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="site_possui" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s10_site" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s10_site" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Utiliza ferramentas de análise (Google Analytics)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Ferramentas que mostram quantos visitantes o site teve e de onde vieram.</span>
-                        </span>
-                    </label>
+                    <label>Há algum canal próprio de vendas online?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="site_analytics" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="site_analytics" value="Nao"> Não</label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Etapa 11: Tecnologia -->
-            <div class="step" data-title="Tecnologia">
-                <div class="step-header">
-                    <h2>11. ERP, Sistemas e Tecnologia</h2>
-                </div>
-                <div class="form-group">
-                    <label>Utiliza sistema de gestão (ERP)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Sistema integrado que controla estoque, vendas e financeiro. Ex: Bling, Tiny, Totvs.</span>
-                        </span>
-                    </label>
-                    <input type="text" name="tec_erp" placeholder="Nome do sistema ou 'Não'">
-                </div>
-                <div class="form-group">
-                    <label>Utiliza CRM para gestão de clientes?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Sistema para registrar interações, histórico e follow-up com clientes.</span>
-                        </span>
-                    </label>
-                    <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="tec_crm" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="tec_crm" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s10_canal_proprio" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s10_canal_proprio" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Há muito retrabalho manual ou planilhas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Você precisa digitar a mesma coisa em dois lugares diferentes?</span>
-                        </span>
-                    </label>
-                    <select name="tec_manual">
-                        <option value="Nao">Não, tudo integrado</option>
-                        <option value="Pouco">Alguns processos</option>
-                        <option value="Muito">Sim, muito manual</option>
+                    <label>São utilizadas ferramentas como Google Analytics?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s10_analytics" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s10_analytics" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Existe intenção de estruturar e-commerce?</label>
+                    <select name="s10_intencao">
+                        <option value="Curto Prazo">Sim, curto prazo</option>
+                        <option value="Medio Prazo">Sim, médio prazo</option>
+                        <option value="Nao">Não</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Etapa 12: Marketplaces -->
-            <div class="step" data-title="Marketplaces">
-                <div class="step-header">
-                    <h2>12. Marketplaces e Canais Externos</h2>
+            <!-- 11. Sistemas e ERP -->
+            <div class="step" data-title="Sistemas">
+                <div class="step-header"><h2>11. Sistemas, ERP e Tecnologia</h2></div>
+                <div class="form-group">
+                    <label>A empresa utiliza algum sistema de gestão (ERP)? Qual?</label>
+                    <input type="text" name="s11_erp">
                 </div>
                 <div class="form-group">
-                    <label>Vende em Marketplaces (ML, Shopee, Amazon)?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Plataformas de terceiros onde você expõe seus produtos.</span>
-                        </span>
-                    </label>
-                    <select name="mktp_vende" onchange="toggleMktpDetail(this.value)">
+                    <label>O ERP atende bem às necessidades?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s11_erp_atende" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s11_erp_atende" value="Parcialmente"> Parcialmente</label>
+                        <label class="radio-option"><input type="radio" name="s11_erp_atende" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Existe utilização de CRM para gestão de clientes?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s11_crm" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s11_crm" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quanto do processo é manual/planilhas?</label>
+                    <select name="s11_manual">
+                        <option value="Muito">Muito</option>
+                        <option value="Pouco">Pouco</option>
+                        <option value="Nada">Nada, tudo integrado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>O retrabalho impacta tempo ou custos?</label>
+                    <textarea name="s11_retrabalho"></textarea>
+                </div>
+            </div>
+
+            <!-- 12. Marketplaces -->
+            <div class="step" data-title="Marketplaces">
+                <div class="step-header"><h2>12. Marketplaces e Canais Externos</h2></div>
+                <div class="form-group">
+                    <label>A empresa vende em marketplaces?</label>
+                    <select name="s12_vende_mktp" onchange="toggleMktpDetail(this.value)">
                         <option value="Nao">Não</option>
                         <option value="Sim">Sim</option>
                     </select>
                 </div>
                 <div id="mktpDetails" style="display:none;">
                     <div class="form-group">
-                        <label>Quais plataformas?
-                            <span class="help-icon">?
-                                <span class="help-tooltip">Liste as principais. Ex: Mercado Livre, Magalu, Shopee.</span>
-                            </span>
-                        </label>
-                        <input type="text" name="mktp_quais">
+                        <label>Quais plataformas estão ativas?</label>
+                        <input type="text" name="s12_plataformas">
                     </div>
                     <div class="form-group">
-                        <label>Controle de estoque é integrado?
-                             <span class="help-icon">?
-                                <span class="help-tooltip">Quando vende no Mercado Livre, baixa automaticamente do seu sistema?</span>
-                            </span>
-                        </label>
+                        <label>O controle de estoque é integrado?</label>
                         <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="mktp_estoque" value="Sim"> Sim</label>
-                            <label class="radio-option"><input type="radio" name="mktp_estoque" value="Nao"> Não</label>
+                            <label class="radio-option"><input type="radio" name="s12_integracao" value="Sim"> Sim</label>
+                            <label class="radio-option"><input type="radio" name="s12_integracao" value="Nao"> Não</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>As taxas são consideradas na precificação?</label>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="s12_taxas" value="Sim"> Sim</label>
+                            <label class="radio-option"><input type="radio" name="s12_taxas" value="Nao"> Não</label>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Etapa 13: Pessoas -->
+            <!-- 13. Pessoas e Gestão -->
             <div class="step" data-title="Pessoas">
-                <div class="step-header">
-                    <h2>13. Pessoas e Processos</h2>
-                </div>
+                <div class="step-header"><h2>13. Pessoas, Gestão e Processos</h2></div>
                 <div class="form-group">
-                    <label>As funções dos funcionários são bem definidas?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Cada um sabe exatamente o que deve fazer, ou todos fazem tudo?</span>
-                        </span>
-                    </label>
-                    <select name="pp_funcoes">
-                        <option value="Sim">Sim, claras</option>
-                        <option value="Parcial">Parcialmente</option>
-                        <option value="Nao">Não, todos fazem tudo</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Existem processos documentados (POP)?
-                         <span class="help-icon">?
-                            <span class="help-tooltip">Procedimento Operacional Padrão: Manuais de como fazer as tarefas da empresa.</span>
-                        </span>
-                    </label>
+                    <label>As funções dos colaboradores estão bem definidas?</label>
                     <div class="radio-group">
-                        <label class="radio-option"><input type="radio" name="pp_processos" value="Sim"> Sim</label>
-                        <label class="radio-option"><input type="radio" name="pp_processos" value="Nao"> Não</label>
+                        <label class="radio-option"><input type="radio" name="s13_funcoes" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s13_funcoes" value="Parcialmente"> Parcialmente</label>
+                        <label class="radio-option"><input type="radio" name="s13_funcoes" value="Nao"> Não</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Principais gargalos operacionais hoje
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Onde a operação trava? Entrega, Produção, Financeiro?</span>
-                        </span>
-                    </label>
-                    <textarea name="pp_gargalos"></textarea>
+                    <label>Existem processos operacionais documentados (POP)?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s13_pop" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s13_pop" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quais são os principais gargalos operacionais?</label>
+                    <textarea name="s13_gargalos"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>O gestor dedica tempo à análise estratégica?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s13_tempo_gestor" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s13_tempo_gestor" value="Nao"> Não</label>
+                    </div>
                 </div>
             </div>
 
-            <!-- Etapa 14: Objetivos -->
+            <!-- 14. Objetivos -->
             <div class="step" data-title="Objetivos">
-                <div class="step-header">
-                    <h2>14. Objetivos da Consultoria</h2>
+                <div class="step-header"><h2>14. Objetivos e Expectativas</h2></div>
+                <div class="form-group">
+                    <label>Quais são os principais problemas financeiros hoje?</label>
+                    <textarea name="s14_problemas_financeiros" required></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Quais os maiores problemas atuais?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O que tira seu sono hoje? Falta de dinheiro, falta de vendas, equipe desmotivada?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_problemas" required></textarea>
+                    <label>Onde a empresa perde mais dinheiro ou oportunidades?</label>
+                    <textarea name="s14_perda_dinheiro"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Onde a empresa mais perde dinheiro/oportunidade?
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Onde você acha que o dinheiro está escorrendo pelo ralo?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_perda_dinheiro"></textarea>
+                    <label>Objetivo principal da consultoria (Curto Prazo):</label>
+                    <input type="text" name="s14_objetivo_curto">
                 </div>
                 <div class="form-group">
-                    <label>Objetivo Principal (Curto Prazo)
-                        <span class="help-icon">?
-                            <span class="help-tooltip">O que precisa ser resolvido nos próximos 30 dias?</span>
-                        </span>
-                    </label>
-                    <input type="text" name="obj_principal">
+                    <label>Metas para os próximos 6 e 12 meses:</label>
+                    <textarea name="s14_metas_futuras"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Meta para 6 e 12 meses
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Onde você quer estar daqui a um ano?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_metas"></textarea>
+                    <label>Existe urgência em algum ponto específico?</label>
+                    <input type="text" name="s14_urgencia">
+                </div>
+            </div>
+
+            <!-- 15. Observações Finais -->
+            <div class="step" data-title="Finalização">
+                <div class="step-header"><h2>15. Observações Finais e Próximos Passos</h2></div>
+                <div class="form-group">
+                    <label>Há alguma informação adicional relevante?</label>
+                    <textarea name="s15_infos_adicionais"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Observações Finais
-                        <span class="help-icon">?
-                            <span class="help-tooltip">Algo mais que o consultor precise saber?</span>
-                        </span>
-                    </label>
-                    <textarea name="obj_obs"></textarea>
+                    <label>Existe disponibilidade de relatórios/backups?</label>
+                    <div class="radio-group">
+                        <label class="radio-option"><input type="radio" name="s15_disponibilidade" value="Sim"> Sim</label>
+                        <label class="radio-option"><input type="radio" name="s15_disponibilidade" value="Nao"> Não</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Expectativas para os próximos passos:</label>
+                    <textarea name="s15_expectativas"></textarea>
                 </div>
             </div>
 
