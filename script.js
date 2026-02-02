@@ -52,21 +52,37 @@ try {
           }
         });
 
-        // --- LISTENER DE AUTH INTEGRADO COM ROTINA DE LIMPEZA ---
+        // --- LISTENER DE AUTH CORRIGIDO ---
         auth.onAuthStateChanged(async (user) => {
             if (appInicializado) return;
             appInicializado = true;
 
             if (user) {
-                // Se usuário detectado, força logout para evitar estado inconsistente
-                console.log("Detectado usuário na inicialização. Forçando logout para garantir estado limpo.");
+                // CORREÇÃO: Se o usuário tem uma sessão, buscamos seus dados e iniciamos o app
+                console.log("Sessão persistente encontrada para:", user.email);
+                showLoading();
                 try {
-                    await auth.signOut();
-                } catch(e) {
-                    console.warn("Erro no logout forçado:", e);
+                    const doc = await db.collection("users").doc(user.uid).get();
+                    if (doc.exists) {
+                        // Dados encontrados, prosseguir para a validação da licença e início do app
+                        await loginSuccess(user.uid, doc.data());
+                    } else {
+                        // Estado inconsistente: usuário existe no Auth mas não no Firestore
+                        console.warn("Usuário autenticado mas sem dados no Firestore. Forçando logout.");
+                        await auth.signOut();
+                        hideLoading();
+                        mostrarTelaLogin();
+                        alert("Dados do seu perfil não foram encontrados. Por favor, faça login novamente.");
+                    }
+                } catch (e) {
+                    console.error("Erro ao verificar sessão persistente:", e);
+                    hideLoading();
+                    mostrarTelaLogin();
+                    alert("Ocorreu um erro ao tentar iniciar sua sessão. Tente novamente.");
                 }
-                mostrarTelaLogin();
             } else {
+                // Se não há usuário, exibe a tela de login (comportamento correto)
+                console.log("Nenhum usuário conectado. Exibindo tela de login.");
                 mostrarTelaLogin();
             }
         });
@@ -128,38 +144,6 @@ function fecharApp() {
         window.appTimers.forEach(t => clearTimeout(t));
         window.appTimers = [];
     }
-}
-
-async function iniciarApp(user) {
-     console.log("Sessão ativa detectada para: ", user.email);
-     window.appIniciado = true;
-     
-     // Lógica de recuperação de sessão existente
-     if (!currentUser) {
-         showLoading();
-         try {
-             const doc = await db.collection("users").doc(user.uid).get();
-             if (doc.exists) {
-                 await loginSuccess(user.uid, doc.data());
-             } else {
-                 // Sessão existe mas sem dados no banco (inconsistência)
-                 console.warn("Usuário autenticado mas sem dados de perfil.");
-                 auth.signOut();
-                 hideLoading();
-                 switchAuthView('loginView'); 
-             }
-         } catch (e) {
-             console.error("Erro ao recuperar sessão:", e);
-             hideLoading();
-             // Fallback para tela de login
-             authScreen.style.display = 'flex';
-         }
-     }
-}
-
-async function iniciarAppSeguro(user) {
-    fecharApp();      // ⛔ fecha tudo primeiro
-    await iniciarApp(user); // ✅ inicia do zero
 }
 
 // --- CONSTANTES DE SEGURANÇA E LICENCIAMENTO ---
@@ -308,29 +292,26 @@ async function loginSuccess(uid, userData) {
     if (userData.license.lastAccess > nowTime + 120000) { 
         alert("Erro de segurança: A data do seu dispositivo parece estar errada (atrasada em relação ao último acesso registrado). Por favor, ajuste o relógio.");
         hideLoading();
-        // Não permite prosseguir
+        auth.signOut();
         return;
     }
 
     // Atualiza lastAccess no banco (Persistência da Regra 5)
-    // Fazemos isso sem esperar (fire and forget) para não travar a UI, ou esperamos se for crítico.
-    // Aqui vamos esperar para garantir consistência.
     userData.license.lastAccess = nowTime;
     
     await db.collection("users").doc(uid).update({ 
         "license.lastAccess": nowTime,
-        // Atualiza expiração caso tenha sido corrigida pelo admin check
         "license.expiration": userData.license.expiration 
     });
 
     // Atualiza objeto local
     currentUser = { uid: uid, ...userData };
-    window.usuarioAtual = currentUser; // Sincroniza com a nova variável global
+    window.usuarioAtual = currentUser;
 
     // Verifica Expiração (Regra 4)
     if (nowTime > userData.license.expiration) {
         authScreen.style.display = 'none';
-        lockScreen.style.display = 'flex'; // Exibe tela de bloqueio
+        lockScreen.style.display = 'flex';
         hideLoading();
         return;
     }
@@ -352,34 +333,25 @@ function proceedToApp() {
 
     updateDaysBadge();
     
-    // Carregar dados salvos no Firestore para o formulário
     if (currentUser.diagnosisData) {
         loadFormDataFromObject(currentUser.diagnosisData);
     }
 
-    // Regra 7: Botão IA visível para todos
     const btnAi = document.querySelector('.btn-ai');
     btnAi.style.display = 'inline-flex';
+    hideLoading();
 }
 
 function handleLogout() {
     if(auth) {
         auth.signOut().then(() => {
-            fecharApp(); // Garante limpeza ao sair
+            fecharApp();
             location.reload();
         });
     } else {
         location.reload();
     }
 }
-
-window.onload = function() {
-    if(!auth) {
-         // Fallback se firebase não carregar
-         authScreen.style.display = 'flex';
-    }
-    // A verificação de usuário agora ocorre automaticamente pelo listener do auth.
-};
 
 // --- SALVAMENTO DE DADOS (AUTO-SAVE NO FIRESTORE) ---
 let timeoutId;
@@ -388,8 +360,7 @@ const form = document.getElementById("diagnosisForm");
 form.querySelectorAll("input, select, textarea").forEach(field => {
     field.addEventListener("input", () => {
         if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
-        // Adiciona o novo timer ao array global para gestão segura
-        timeoutId = setTimeout(saveToFirebase, 2000); // Debounce 2s
+        timeoutId = setTimeout(saveToFirebase, 2000);
         window.appTimers.push(timeoutId);
     });
     field.addEventListener("change", saveToFirebase);
@@ -404,10 +375,8 @@ async function saveToFirebase() {
         data[key] = value;
     });
 
-    // Atualiza objeto local
     currentUser.diagnosisData = data;
 
-    // UI de salvamento
     const cloudStatus = document.querySelector('.cloud-status');
     if(cloudStatus) cloudStatus.innerHTML = `<span class="cloud-dot" style="background:yellow"></span> Salvando...`;
     
@@ -440,13 +409,11 @@ function loadFormDataFromObject(data) {
             if(key === 'mktp_vende') toggleMktpDetail(data[key]);
         }
     });
-    // Atualiza navegação visualmente
     showStep(currentStep); 
 }
 
 // --- SISTEMA DE BLOQUEIO E CONTRA-SENHA (REGRA 3 e 4) ---
 function generateRandomCode() {
-    // Regra 3: Número entre 100 e 1000
     generatedRandomNumber = Math.floor(Math.random() * 901) + 100;
     const display = document.getElementById('displayRandomCode');
     display.textContent = generatedRandomNumber;
@@ -455,7 +422,6 @@ function generateRandomCode() {
 
 async function validateUnlock() {
     const input = document.getElementById('unlockInput').value.trim();
-    // Regra 4: Formato XXXXX-YYY
     const parts = input.split('-');
     
     if (parts.length !== 2) return alert("Formato inválido. Use XXXXX-YYY.");
@@ -463,23 +429,19 @@ async function validateUnlock() {
     const codeInput = parseInt(parts[0]);
     const daysInput = parseInt(parts[1]);
     
-    // Regra 3: Fórmula (R + 13) * 9 + 1954
     const expectedCode = (generatedRandomNumber + CONST_ADD) * CONST_MULT + CONST_BASE;
 
     if (codeInput === expectedCode) {
         const now = new Date();
-        // Adiciona dias à data atual
         const newExpiration = now.getTime() + (daysInput * 24 * 60 * 60 * 1000);
         
         showLoading();
         try {
-            // Atualiza Firestore
             await db.collection("users").doc(currentUser.uid).update({
                 "license.expiration": newExpiration,
                 "license.lastAccess": now.getTime()
             });
             
-            // Atualiza local
             currentUser.license.expiration = newExpiration;
             currentUser.license.lastAccess = now.getTime();
             
@@ -515,7 +477,7 @@ const steps = document.querySelectorAll(".step");
 function showStep(n) {
     steps.forEach((step, index) => {
         step.classList.remove("active");
-        step.style.display = "none"; // Garante ocultação
+        step.style.display = "none";
         if (index === n) {
             step.classList.add("active");
             step.style.display = "block";
@@ -540,7 +502,6 @@ function showStep(n) {
 function nextPrev(n) {
     if (n === 1 && !validateForm()) return false;
     
-    // Oculta step atual
     steps[currentStep].style.display = "none";
     currentStep += n;
     
@@ -593,8 +554,6 @@ function toggleAdsDetail(val) { document.getElementById('adsDetails').style.disp
 function toggleMktpDetail(val) { document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
 
 // --- IA / RELATÓRIO / BACKUP ---
-
-// *** FUNÇÃO MODIFICADA ***
 function generateReport() {
     document.getElementById("diagnosisForm").style.display = "none";
     document.querySelector('.nav-buttons').style.display = 'none';
@@ -603,12 +562,10 @@ function generateReport() {
     const now = new Date();
     document.getElementById("reportDate").innerText = now.toLocaleDateString() + " às " + now.toLocaleTimeString();
     
-    // Renderiza relatório simples
     let html = "";
     steps.forEach((step) => {
         const title = step.querySelector('.step-header h2').innerText;
         html += `<div class="report-block"><h3>${title}</h3>`;
-        // Logica de extração de inputs igual ao original
         const inputs = step.querySelectorAll("input, select, textarea");
         let processedNames = [];
         inputs.forEach(input => {
@@ -619,9 +576,8 @@ function generateReport() {
             if(processedNames.includes(input.name)) return;
             
             let val = input.value;
-            let labelText = input.name; // Fallback
+            let labelText = input.name;
 
-            // Tenta pegar label
             if (input.closest('.form-group')) {
                 const label = input.closest('.form-group').querySelector('label');
                 if(label) labelText = label.innerText.split('?')[0].replace('*','').trim();
@@ -643,11 +599,9 @@ function generateReport() {
     });
     document.getElementById("reportContent").innerHTML = html;
 
-    // *** NOVA CHAMADA PARA ENVIAR O E-MAIL ***
     sendReportByEmail();
 }
 
-// *** NOVA FUNÇÃO PARA ENVIAR E-MAIL ***
 function sendReportByEmail() {
     alert("Seu programa de e-mail será aberto para enviar o diagnóstico. Por favor, verifique e clique em 'Enviar'.");
 
@@ -660,7 +614,6 @@ function sendReportByEmail() {
     body += `Data: ${new Date().toLocaleString()}\n`;
     body += "------------------------------------------------------\n\n";
 
-    // Constrói o corpo do e-mail em texto plano para máxima compatibilidade
     steps.forEach((step) => {
         const title = step.querySelector('.step-header h2').innerText;
         body += `--- ${title.toUpperCase()} ---\n\n`;
@@ -697,30 +650,23 @@ function sendReportByEmail() {
 
     const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
-    // Abre o link no cliente de e-mail do usuário
     window.location.href = mailtoLink;
 }
 
-
-// --- NOVA FUNÇÃO DE EDIÇÃO (VOLTA P/ PAGINA 1) ---
 function editForm() {
     document.getElementById("reportSection").style.display = "none";
     document.getElementById("diagnosisForm").style.display = "block";
     document.querySelector('.nav-buttons').style.display = 'flex';
     
-    // Reseta a visualização para a primeira etapa
     currentStep = 0;
     showStep(currentStep);
     
-    // Se necessário, rola para o topo
     window.scrollTo(0, 0);
 }
 
-// --- NOVA LÓGICA DE IA / PLANO DE AÇÃO ---
 async function generateAdvice() {
     showLoading();
     
-    // Leitura integral dos dados (simulação de processamento)
     await new Promise(r => setTimeout(r, 1500)); 
     
     const data = currentUser.diagnosisData || {};
@@ -728,7 +674,6 @@ async function generateAdvice() {
     const segmento = (data.empresa_segmento || "").toLowerCase();
     const faturamento = parseFloat(data.empresa_faturamento || 0);
     
-    // Identificadores de contexto
     const isVarejo = ["varejo", "loja", "comércio", "venda", "produto", "roupas", "moda", "mercado"].some(k => segmento.includes(k));
     const isB2C = (data.empresa_publico === "B2C" || data.empresa_publico === "Hibrido");
     
@@ -740,28 +685,18 @@ async function generateAdvice() {
         Com base na leitura integral do seu diagnóstico, preparamos as seguintes recomendações profissionais, focadas em eficiência e crescimento.
     </div>`;
 
-    // ---------------------------------------------------------
-    // 1. OTIMIZAÇÃO E CORTE DE CUSTOS (PRIORIDADE 1)
-    // ---------------------------------------------------------
     let costsAdvice = `<h4>1. Saneamento Financeiro e Redução de Custos</h4>
     <p style="margin-bottom:10px;">Antes de buscar novas receitas, é crucial estancar vazamentos financeiros.</p>
     <ul>`;
     
-    // Assinaturas e Recorrentes
     costsAdvice += `<li><strong>Auditoria de Assinaturas (SaaS/Serviços):</strong> Revise imediatamente extratos de cartão corporativo. Cancele softwares duplicados ou subutilizados.</li>`;
-    
-    // Telefonia/Internet
     costsAdvice += `<li><strong>Renegociação de Contratos (Telecom):</strong> Se seus contratos de internet e telefonia têm mais de 12 meses, solicite cotação na concorrência e exija redução na operadora atual. A economia média é de 20%.</li>`;
-    
-    // Eficiência Operacional
     costsAdvice += `<li><strong>Eficiência Operacional:</strong> Implemente política de "Desperdício Zero". Troque iluminação por LED (se loja física) e instale sensores de presença em áreas comuns.</li>`;
     
-    // Controle Financeiro Específico
     if(data.fin_controle !== "Sim") {
         costsAdvice += `<li><b style="color:#e74c3c">Ação Crítica:</b> Implemente um DRE (Demonstrativo de Resultado) gerencial imediatamente. Sem saber exatamente para onde vai cada centavo, qualquer estratégia de venda é arriscada.</li>`;
     }
     
-    // Dívidas
     if(data.fin_dividas && data.fin_dividas.length > 5) {
         costsAdvice += `<li><strong>Gestão de Passivos:</strong> Priorize a renegociação das dívidas citadas (${data.fin_dividas.substring(0, 30)}...). Troque dívidas caras (cheque especial/cartão) por crédito com garantia (imóvel/veículo) que possui juros menores.</li>`;
     }
@@ -769,29 +704,22 @@ async function generateAdvice() {
     costsAdvice += `</ul>`;
     html += `<div class="advice-card">${costsAdvice}</div>`;
 
-    // ---------------------------------------------------------
-    // 2. ESTRATÉGIA DIGITAL E POSICIONAMENTO (MERCADO ATUAL)
-    // ---------------------------------------------------------
     let digitalAdvice = `<h4>2. Estratégia Digital 360º</h4><ul>`;
 
-    // Redes Sociais
     digitalAdvice += `<li><strong>Instagram e Facebook:</strong> Não utilize apenas como vitrine de fotos estáticas. O algoritmo atual prioriza vídeos curtos (Reels). Humanize a marca mostrando bastidores e "quem faz". A constância sugerida é de 1 post no feed e 5 a 10 stories diários.</li>`;
     
-    // Google Meu Negócio
     if(data.seo_gmn !== "Sim") {
         digitalAdvice += `<li><strong>Google Meu Negócio (Urgente):</strong> Sua empresa precisa aparecer no mapa. É tráfego gratuito e qualificado. Cadastre-se, adicione fotos reais e peça avaliações para os melhores clientes.</li>`;
     } else {
         digitalAdvice += `<li><strong>Otimização Google Maps:</strong> Responda a todas as avaliações (boas ou ruins) em até 24h. Adicione fotos novas semanalmente para manter relevância no topo das buscas locais.</li>`;
     }
 
-    // Site e Landing Pages
     if(data.site_possui === "Nao") {
         digitalAdvice += `<li><strong>Landing Pages:</strong> Mesmo sem um site complexo, crie Landing Pages (Páginas de Venda Única) para suas promoções específicas. Isso aumenta a conversão de campanhas pagas drasticamente em comparação a mandar o cliente para o WhatsApp direto.</li>`;
     } else {
         digitalAdvice += `<li><strong>Experiência do Site:</strong> Verifique a velocidade de carregamento mobile. Se demorar mais de 3 segundos, você está perdendo até 40% do tráfego pago.</li>`;
     }
 
-    // Marketplaces
     if(isVarejo) {
         if(data.mktp_vende === "Nao") {
             digitalAdvice += `<li><strong>Diversificação em Marketplaces:</strong> Inicie operação no Mercado Livre ou Shopee. Eles possuem tráfego próprio gigantesco. Use-os como canal de aquisição de cliente (primeira venda) e tente fidelizar para venda direta depois.</li>`;
@@ -800,7 +728,6 @@ async function generateAdvice() {
         }
     }
 
-    // Tráfego Pago vs Orgânico
     if(data.ads_investe === "Nao") {
         digitalAdvice += `<li><strong>Tráfego Pago (Ads):</strong> O alcance orgânico está morrendo. Separe uma verba de teste (ex: R$ 300-500) para Google Ads (fundo de funil/quem já busca o produto) ou Meta Ads (geração de desejo).</li>`;
     } else {
@@ -810,10 +737,6 @@ async function generateAdvice() {
     digitalAdvice += `</ul>`;
     html += `<div class="advice-card">${digitalAdvice}</div>`;
 
-    // ---------------------------------------------------------
-    // 3. SOURCING E IMPORTAÇÃO (SE APLICÁVEL)
-    // ---------------------------------------------------------
-    // Lógica: Sugerir apenas se for comércio/varejo e tiver faturamento relevante ou perfil B2C
     if(isVarejo && isB2C) {
         let chinaAdvice = `<h4>3. Estratégia de Suprimentos (Importação)</h4><ul>`;
         chinaAdvice += `<li><strong>Importação Direta da China:</strong> Dado o seu segmento (${segmento}), existe alta oportunidade de margem na importação direta.</li>`;
@@ -829,7 +752,6 @@ async function generateAdvice() {
         html += `<div class="advice-card">${chinaAdvice}</div>`;
     }
 
-    // Atualiza HTML e rola
     document.getElementById("adviceContent").innerHTML = html;
     hideLoading();
     document.getElementById("adviceSection").scrollIntoView({ behavior: 'smooth' });
@@ -838,7 +760,6 @@ async function generateAdvice() {
 // --- BACKUP & RESTORE (JSON Local <-> Firebase) ---
 function backupData() {
     if(!currentUser) return;
-    // Cria arquivo JSON com os dados atuais do usuário
     const backupObj = {
         userProfile: { name: currentUser.name, email: currentUser.email },
         diagnosisData: currentUser.diagnosisData
@@ -863,13 +784,10 @@ function handleFileSelect(event) {
             const content = JSON.parse(e.target.result);
             if(content.diagnosisData) {
                 showLoading();
-                // Carrega no form visualmente
                 loadFormDataFromObject(content.diagnosisData);
-                // Salva no Firebase
                 await db.collection("users").doc(currentUser.uid).update({
                     diagnosisData: content.diagnosisData
                 });
-                // Atualiza objeto local
                 currentUser.diagnosisData = content.diagnosisData;
                 
                 hideLoading();
@@ -892,15 +810,13 @@ async function clearData() {
     } 
 }
 
-// *** FUNÇÃO MODIFICADA ***
 async function fillDemoData() {
     if(!confirm("Isso substituirá os dados atuais por dados de teste completos.")) return;
 
-    // 1. Dados Completos e Realistas de Pequeno Comércio
     const demoData = {
         empresa_nome: "Loja Modelo & Estilo",
-        empresa_email_contato: "contato@lojamodelo.com.br", // <-- DADO ADICIONADO
-        empresa_whatsapp: "(11) 98765-4321", // <-- DADO ADICIONADO
+        empresa_email_contato: "contato@lojamodelo.com.br",
+        empresa_whatsapp: "(11) 98765-4321",
         empresa_cnpj: "12.345.678/0001-90",
         empresa_segmento: "Comércio Varejista de Roupas",
         empresa_tempo: "5",
@@ -957,7 +873,6 @@ async function fillDemoData() {
         obj_obs: "Preciso de ajuda urgente com fluxo de caixa."
     };
 
-    // 2. Itera sobre o objeto e preenche o DOM
     for (const key in demoData) {
         const val = demoData[key];
         const fields = document.getElementsByName(key);
@@ -966,746 +881,17 @@ async function fillDemoData() {
             const field = fields[0]; 
 
             if (field.type === 'radio') {
-                // Radio Buttons
                 const radio = document.querySelector(`input[name="${key}"][value="${val}"]`);
                 if (radio) radio.checked = true;
             } else {
-                // Text, Number, Select, Textarea
                 field.value = val;
             }
         }
     }
 
-    // 3. Controla visibilidade de campos condicionais
     if (typeof toggleAdsDetail === 'function') toggleAdsDetail(demoData.ads_investe);
     if (typeof toggleMktpDetail === 'function') toggleMktpDetail(demoData.mktp_vende);
 
-    // 4. Salva no Firebase
     await saveToFirebase();
     alert("Dados de teste preenchidos com sucesso!");
-}```
-
----
-
-### **`style.css` (Completo, sem alterações)**
-
-Este arquivo não precisou de nenhuma modificação, pois os novos campos de formulário utilizam os estilos já existentes.
-
-```css
-:root {
-    --primary-color: #0f3460;
-    --secondary-color: #e94560;
-    --accent-color: #16213e;
-    --light-bg: #f4f4f4;
-    --white: #ffffff;
-    --text-color: #333;
-    --border-radius: 8px;
-    --transition: all 0.3s ease;
-    --demo-btn-color: #f39c12;
-    --backup-btn-color: #27ae60;
-    --restore-btn-color: #2980b9;
-    --lock-bg: rgba(0, 0, 0, 0.95);
-    --cloud-status-color: #2ecc71;
-}
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-body {
-    background-color: var(--light-bg);
-    color: var(--text-color);
-    line-height: 1.6;
-    padding-bottom: 50px;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-/* --- AUTH SCREEN STYLES --- */
-#authScreen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-    z-index: 2000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
-
-.auth-card {
-    background: white;
-    width: 100%;
-    max-width: 400px;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    text-align: center;
-}
-
-.auth-card h2 {
-    color: var(--primary-color);
-    margin-bottom: 10px;
-}
-
-.auth-card p {
-    color: #666;
-    margin-bottom: 20px;
-    font-size: 0.9rem;
-}
-
-.auth-form input {
-    width: 100%;
-    padding: 12px;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-}
-
-.auth-btn {
-    width: 100%;
-    padding: 12px;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    margin-bottom: 10px;
-    transition: var(--transition);
-}
-
-.auth-btn:hover {
-    background-color: var(--accent-color);
-}
-
-.google-btn {
-    background-color: white;
-    color: #555;
-    border: 1px solid #ddd;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    position: relative;
-}
-
-.google-btn::before {
-    content: '';
-    display: block;
-    width: 20px;
-    height: 20px;
-    background: url('https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg') no-repeat center center;
-    background-size: contain;
-}
-
-.google-btn:hover {
-    background-color: #f8f9fa;
-}
-
-.auth-links {
-    margin-top: 15px;
-    font-size: 0.85rem;
-}
-
-.auth-links a {
-    color: var(--secondary-color);
-    text-decoration: none;
-    cursor: pointer;
-    margin: 0 5px;
-}
-
-.auth-links a:hover {
-    text-decoration: underline;
-}
-
-.auth-view {
-    display: none;
-}
-.auth-view.active {
-    display: block;
-}
-
-/* --- LOCK SCREEN (LICENSING) --- */
-#lockScreen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--lock-bg);
-    z-index: 3000;
-    display: none; /* Controlado via JS */
-    justify-content: center;
-    align-items: center;
-    color: white;
-    padding: 20px;
-}
-
-.lock-content {
-    background: #2c3e50;
-    padding: 40px;
-    border-radius: 10px;
-    text-align: center;
-    max-width: 500px;
-    box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
-    border: 2px solid var(--secondary-color);
-}
-
-.lock-content h2 { color: var(--secondary-color); margin-bottom: 20px; }
-.lock-content p { margin-bottom: 15px; color: #ecf0f1; }
-
-.generated-code-display {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--demo-btn-color);
-    margin: 20px 0;
-    letter-spacing: 2px;
-    background: rgba(0,0,0,0.3);
-    padding: 10px;
-    border-radius: 5px;
-}
-
-.lock-btn {
-    background-color: var(--secondary-color);
-    color: white;
-    border: none; padding: 10px 20px;
-    border-radius: 5px; cursor: pointer;
-    font-size: 1rem; margin-top: 10px;
-}
-
-/* --- SETTINGS MODAL --- */
-#settingsModal {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
-    z-index: 2500;
-    display: none;
-    justify-content: center;
-    align-items: center;
-}
-.settings-card {
-    background: white; width: 90%; max-width: 500px;
-    padding: 25px; border-radius: 10px; position: relative;
-}
-.close-settings {
-    position: absolute; top: 10px; right: 15px;
-    font-size: 1.5rem; cursor: pointer; color: #aaa;
-}
-
-/* --- APP HEADER --- */
-header {
-    background-color: var(--primary-color);
-    color: var(--white);
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    position: relative;
-}
-
-header h1 {
-    font-size: 1.5rem;
-    margin-bottom: 5px;
-}
-
-.user-welcome {
-    font-size: 0.85rem;
-    opacity: 0.9;
-    margin-top: 5px;
-    background: rgba(255,255,255,0.1);
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-}
-
-.header-controls {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-.header-btn {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.3);
-    color: white;
-    font-size: 0.8rem;
-    padding: 5px 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.header-btn:hover {
-    background: rgba(255,255,255,0.1);
-}
-
-.remaining-days-badge {
-    background-color: var(--demo-btn-color);
-    color: white;
-    font-size: 0.75rem;
-    padding: 2px 8px;
-    border-radius: 10px;
-    margin-left: 5px;
-    vertical-align: middle;
-}
-
-/* Cloud Status Indicator */
-.cloud-status {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.8rem;
-    color: var(--cloud-status-color);
-    background: rgba(0,0,0,0.2);
-    padding: 5px 10px;
-    border-radius: 15px;
-    margin-right: 10px;
-}
-.cloud-dot {
-    width: 8px; height: 8px;
-    background-color: var(--cloud-status-color);
-    border-radius: 50%;
-    display: inline-block;
-    box-shadow: 0 0 5px var(--cloud-status-color);
-}
-
-/* Progress Bar */
-.progress-container {
-    width: 100%;
-    background-color: #ddd;
-    height: 10px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.progress-bar {
-    height: 100%;
-    background-color: var(--secondary-color);
-    width: 0%;
-    transition: width 0.4s ease;
-}
-
-/* Main Container */
-.container {
-    max-width: 800px;
-    margin: 30px auto;
-    background: var(--white);
-    padding: 30px;
-    border-radius: var(--border-radius);
-    box-shadow: 0 0 20px rgba(0,0,0,0.05);
-    display: none; /* Escondido até login */
-    flex: 1;
-}
-
-/* Steps */
-.step {
-    display: none; 
-    animation: fadeIn 0.5s;
-}
-
-.step.active {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.step-header {
-    border-bottom: 2px solid var(--light-bg);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-    color: var(--primary-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-/* Form Fields */
-.form-group {
-    margin-bottom: 20px;
-    position: relative;
-}
-
-label {
-    display: inline-block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--accent-color);
-}
-
-/* TOOLTIP (AJUDA) */
-.help-icon {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 18px;
-    height: 18px;
-    background-color: #bbb;
-    color: white;
-    border-radius: 50%;
-    font-size: 12px;
-    font-weight: bold;
-    margin-left: 8px;
-    cursor: help;
-    position: relative;
-    vertical-align: middle;
-}
-
-.help-tooltip {
-    visibility: hidden;
-    width: 280px;
-    background-color: #333;
-    color: #fff;
-    text-align: left;
-    border-radius: 6px;
-    padding: 10px;
-    position: absolute;
-    z-index: 1000;
-    bottom: 135%;
-    left: 50%;
-    transform: translateX(-10%); 
-    opacity: 0;
-    transition: opacity 0.3s;
-    font-size: 0.85rem;
-    font-weight: normal;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    line-height: 1.4;
-}
-
-.help-tooltip::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 10%;
-    margin-left: -5px;
-    border-width: 5px;
-    border-style: solid;
-    border-color: #333 transparent transparent transparent;
-}
-
-.help-icon:hover .help-tooltip,
-.help-icon:focus .help-tooltip {
-    visibility: visible;
-    opacity: 1;
-}
-
-input[type="text"],
-input[type="number"],
-input[type="email"],
-input[type="password"],
-input[type="date"],
-input[type="tel"],
-select,
-textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: var(--border-radius);
-    font-size: 1rem;
-    transition: var(--transition);
-}
-
-input:focus, select:focus, textarea:focus {
-    border-color: var(--primary-color);
-    outline: none;
-    box-shadow: 0 0 5px rgba(15, 52, 96, 0.2);
-}
-
-textarea {
-    resize: vertical;
-    min-height: 100px;
-}
-
-/* Radio & Checkbox Groups */
-.radio-group, .checkbox-group {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-    margin-top: 5px;
-}
-
-.radio-option, .checkbox-option {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    cursor: pointer;
-    background: #f9f9f9;
-    padding: 10px 15px;
-    border-radius: 20px;
-    border: 1px solid #ddd;
-}
-
-.radio-option:hover, .checkbox-option:hover {
-    background: #eef;
-}
-
-/* Navigation Buttons */
-.nav-buttons {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
-}
-
-button {
-    padding: 12px 25px;
-    border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: bold;
-    transition: var(--transition);
-}
-
-.btn-prev {
-    background-color: #ccc;
-    color: #333;
-}
-
-.btn-next {
-    background-color: var(--primary-color);
-    color: var(--white);
-}
-
-.btn-submit {
-    background-color: var(--secondary-color);
-    color: var(--white);
-}
-
-/* Custom Button Styles */
-.btn-demo {
-    background-color: var(--white);
-    color: var(--demo-btn-color);
-    border: 2px solid var(--demo-btn-color);
-    padding: 5px 15px;
-    font-size: 0.85rem;
-    border-radius: 20px;
-}
-.btn-demo:hover {
-    background-color: var(--demo-btn-color);
-    color: var(--white);
-}
-
-button:hover {
-    opacity: 0.9;
-    transform: translateY(-2px);
-}
-
-button:disabled {
-    background-color: #eee;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* Report Section */
-#reportSection {
-    display: none;
-}
-
-.report-header {
-    text-align: center;
-    margin-bottom: 30px;
-    border-bottom: 2px solid var(--primary-color);
-    padding-bottom: 20px;
-}
-
-.report-block {
-    margin-bottom: 25px;
-    page-break-inside: avoid;
-}
-
-.report-block h3 {
-    background-color: var(--light-bg);
-    padding: 8px;
-    border-left: 5px solid var(--primary-color);
-    margin-bottom: 10px;
-}
-
-.report-item {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 5px;
-    border-bottom: 1px dotted #ccc;
-    padding-bottom: 2px;
-}
-
-.report-item strong {
-    width: 60%;
-}
-.report-item span {
-    width: 40%;
-    text-align: right;
-    color: #555;
-}
-
-/* Advice / AI Section */
-#adviceSection {
-    margin-top: 40px;
-    background-color: #eef2f7;
-    padding: 20px;
-    border-radius: 8px;
-    border: 1px solid #d1d9e6;
-    margin-bottom: 20px;
-}
-
-#adviceSection h2 {
-    color: var(--primary-color);
-    margin-bottom: 15px;
-    font-size: 1.2rem;
-}
-
-.advice-intro {
-    margin-bottom: 20px;
-    font-style: italic;
-    color: #555;
-    background: #fff;
-    padding: 10px;
-    border-radius: 4px;
-}
-
-.advice-card {
-    background: white;
-    padding: 20px;
-    margin-bottom: 15px;
-    border-left: 4px solid var(--secondary-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    white-space: pre-line; /* Permite quebras de linha */
-}
-
-.advice-card h4 {
-    color: var(--primary-color);
-    margin-bottom: 8px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-}
-
-.advice-card ul {
-    margin-left: 20px;
-    margin-top: 5px;
-}
-
-.advice-card li {
-    margin-bottom: 5px;
-    font-size: 0.95rem;
-}
-
-.action-bar {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 20px;
-    flex-wrap: wrap;
-    padding-bottom: 20px;
-}
-
-.btn-print {
-    background-color: var(--accent-color);
-    color: white;
-}
-
-.btn-reset {
-    background-color: #7f8c8d;
-    color: white;
-}
-
-.btn-ai {
-    background-color: #8e44ad;
-    color: white;
-    display: none; /* Oculto por padrão, só aparece para Admin */
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-backup {
-    background-color: var(--backup-btn-color);
-    color: white;
-}
-
-.btn-restore {
-    background-color: var(--restore-btn-color);
-    color: white;
-}
-
-/* Spinner */
-.loading-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255,255,255,0.7);
-    display: none; justify-content: center; align-items: center; z-index: 9999;
-}
-.spinner {
-    border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color);
-    border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-
-/* Footer */
-footer {
-    background-color: #333;
-    color: white;
-    text-align: center;
-    padding: 15px;
-    margin-top: auto;
-}
-
-footer a {
-    color: white;
-    text-decoration: none;
-    font-weight: bold;
-}
-
-footer a:hover {
-    color: var(--secondary-color);
-    text-decoration: underline;
-}
-
-.input-symbol-wrapper {
-    position: relative;
-}
-.input-symbol-wrapper::before {
-    content: "R$";
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #777;
-}
-.input-symbol-wrapper input {
-    padding-left: 35px;
-}
-
-@media (max-width: 600px) {
-    .container { margin: 10px; padding: 15px; }
-    .radio-group { flex-direction: column; gap: 5px; }
-    .radio-option { width: 100%; }
-    .help-tooltip { left: -100px; width: 250px; }
-    .step-header { flex-direction: column; align-items: flex-start; }
-    .auth-card { padding: 20px; }
-    .header-controls { position: relative; top: 0; right: 0; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
-    .cloud-status { display: none; } /* Economizar espaço mobile */
-}
-
-@media print {
-    body { background-color: white; }
-    header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer, .loading-overlay { display: none !important; }
-    .container { box-shadow: none; margin: 0; padding: 0; max-width: 100%; display: block !important; }
-    #diagnosisForm { display: none; }
-    #reportSection { display: block !important; }
-    #adviceSection { display: block !important; }
-    .report-item { font-size: 12px; }
 }
