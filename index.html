@@ -119,28 +119,6 @@
         </div>
     </div>
 
-    <!-- [[[[[ NOVO MODAL DE CONTATO ]]]]] -->
-    <div id="contactModal">
-        <div class="settings-card"> <!-- Reutiliza o estilo do card de configurações -->
-            <span class="close-settings" onclick="closeContactModal()">&times;</span>
-            <h2>Enviar Diagnóstico</h2>
-            <p>Por favor, informe seu e-mail e WhatsApp para receber o resultado completo da análise.</p>
-            <hr style="margin: 15px 0;">
-            <form id="contactForm" onsubmit="handleContactSubmit(event)">
-                <div class="form-group">
-                    <label for="contactEmail">E-mail para Envio *</label>
-                    <input type="email" id="contactEmail" placeholder="seu.email@exemplo.com" required>
-                </div>
-                <div class="form-group">
-                    <label for="contactWhatsapp">WhatsApp para Contato *</label>
-                    <input type="tel" id="contactWhatsapp" placeholder="(99) 99999-9999" required>
-                </div>
-                <button type="submit" class="auth-btn" style="width: 100%;">Enviar e Gerar Relatório</button>
-            </form>
-        </div>
-    </div>
-    <!-- [[[[[ FIM DO NOVO MODAL ]]]]] -->
-
     <!-- APLICAÇÃO PRINCIPAL -->
     <div class="progress-container">
         <div class="progress-bar" id="progressBar"></div>
@@ -178,6 +156,20 @@
                     </label>
                     <input type="text" name="empresa_nome" required>
                 </div>
+                <!-- CAMPOS ADICIONADOS -->
+                <div class="form-group">
+                    <label>E-mail de Contato
+                        <span class="help-icon">?<span class="help-tooltip">Principal e-mail para contato comercial com a empresa.</span></span>
+                    </label>
+                    <input type="email" name="empresa_email_contato" placeholder="contato@suaempresa.com.br">
+                </div>
+                <div class="form-group">
+                    <label>WhatsApp
+                        <span class="help-icon">?<span class="help-tooltip">Número de WhatsApp para atendimento e vendas.</span></span>
+                    </label>
+                    <input type="tel" name="empresa_whatsapp" placeholder="(XX) XXXXX-XXXX">
+                </div>
+                <!-- FIM DOS CAMPOS ADICIONADOS -->
                 <div class="form-group">
                     <label>CNPJ
                         <span class="help-icon">?<span class="help-tooltip">Cadastro Nacional da Pessoa Jurídica. Formato: 00.000.000/0000-00.</span></span>

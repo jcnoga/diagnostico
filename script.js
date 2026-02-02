@@ -545,7 +545,7 @@ function nextPrev(n) {
     currentStep += n;
     
     if (currentStep >= steps.length) {
-        generateReport(); // <<<<<< ALTERAÇÃO IMPORTANTE: Agora chama a função que abre o modal.
+        generateReport();
         return false;
     }
     showStep(currentStep);
@@ -593,86 +593,7 @@ function toggleAdsDetail(val) { document.getElementById('adsDetails').style.disp
 function toggleMktpDetail(val) { document.getElementById('mktpDetails').style.display = (val === 'Sim') ? 'block' : 'none'; }
 
 // --- IA / RELATÓRIO / BACKUP ---
-
-// [[[[[ NOVA LÓGICA DE GERAÇÃO DE RELATÓRIO ]]]]]
-
-// 1. Nova função: Abre o modal para pedir e-mail e WhatsApp.
-// Esta função é chamada pelo botão "Gerar Diagnóstico".
 function generateReport() {
-    const modal = document.getElementById('contactModal');
-    if (modal) {
-        // Pré-preenche o campo de e-mail com o e-mail de login do usuário, se disponível
-        if (currentUser && currentUser.email) {
-            document.getElementById('contactEmail').value = currentUser.email;
-        }
-        modal.style.display = 'flex';
-    } else {
-        console.error("Modal de contato não foi encontrado no DOM.");
-        // Fallback: Se o modal falhar, gera o relatório antigo para não quebrar a aplicação.
-        displayFinalReport();
-    }
-}
-
-// 2. Nova função: Fecha o modal de contato.
-function closeContactModal() {
-    const modal = document.getElementById('contactModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-// 3. Nova função: Valida e envia os dados de contato para o Firebase.
-async function handleContactSubmit(event) {
-    event.preventDefault(); // Impede o formulário de recarregar a página
-
-    const email = document.getElementById('contactEmail').value.trim();
-    const whatsapp = document.getElementById('contactWhatsapp').value.trim();
-
-    // Validação para garantir que os campos não estão vazios.
-    if (!email || !whatsapp) {
-        alert("Por favor, preencha o e-mail e o WhatsApp para continuar.");
-        return;
-    }
-    
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(email)) {
-        alert("Por favor, insira um endereço de e-mail válido.");
-        return;
-    }
-
-    if (!currentUser || !currentUser.uid) {
-        alert("Erro: Usuário não está logado. Não é possível salvar os dados.");
-        return;
-    }
-
-    showLoading();
-    
-    try {
-        // Salva as informações de contato no documento do usuário no Firebase
-        await db.collection("users").doc(currentUser.uid).update({
-            contactForReport: {
-                email: email,
-                whatsapp: whatsapp,
-                timestamp: new Date().toISOString() // Salva a data do envio
-            }
-        });
-
-        closeContactModal(); // Fecha o modal
-        
-        // AGORA SIM, chama a função que mostra o relatório na tela
-        displayFinalReport();
-
-    } catch (e) {
-        console.error("Erro ao salvar informações de contato no Firebase:", e);
-        alert("Ocorreu um erro ao salvar suas informações. Por favor, tente novamente.");
-    } finally {
-        hideLoading();
-    }
-}
-
-// 4. Função original `generateReport` foi RENOMEADA para `displayFinalReport`.
-// Esta função agora é chamada somente APÓS o envio dos contatos.
-function displayFinalReport() {
     document.getElementById("diagnosisForm").style.display = "none";
     document.querySelector('.nav-buttons').style.display = 'none';
     document.getElementById("reportSection").style.display = "block";
@@ -720,7 +641,6 @@ function displayFinalReport() {
     });
     document.getElementById("reportContent").innerHTML = html;
 }
-// [[[[[ FIM DA NOVA LÓGICA ]]]]]
 
 // --- NOVA FUNÇÃO DE EDIÇÃO (VOLTA P/ PAGINA 1) ---
 function editForm() {
@@ -918,6 +838,8 @@ async function fillDemoData() {
     // 1. Dados Completos e Realistas de Pequeno Comércio
     const demoData = {
         empresa_nome: "Loja Modelo & Estilo",
+        empresa_email_contato: "contato@lojamodelo.com.br", // <-- DADO ADICIONADO
+        empresa_whatsapp: "(11) 98765-4321", // <-- DADO ADICIONADO
         empresa_cnpj: "12.345.678/0001-90",
         empresa_segmento: "Comércio Varejista de Roupas",
         empresa_tempo: "5",

@@ -414,7 +414,7 @@ input[type="number"],
 input[type="email"],
 input[type="password"],
 input[type="date"],
-input[type="tel"], /* Adicionado para WhatsApp */
+input[type="tel"],
 select,
 textarea {
     width: 100%;
@@ -695,31 +695,6 @@ footer a:hover {
     padding-left: 35px;
 }
 
-
-/* [[[[[ NOVOS ESTILOS PARA O MODAL DE CONTATO ]]]]] */
-#contactModal {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
-    z-index: 2600; /* Z-index maior para ficar sobre outros modais */
-    display: none; /* Começa escondido */
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
-
-#contactModal .settings-card {
-    max-width: 450px;
-    text-align: center;
-}
-
-#contactModal label {
-    text-align: left; /* Alinha labels à esquerda dentro do modal */
-    display: block;
-}
-/* [[[[[ FIM DOS NOVOS ESTILOS ]]]]] */
-
-
 @media (max-width: 600px) {
     .container { margin: 10px; padding: 15px; }
     .radio-group { flex-direction: column; gap: 5px; }
@@ -733,7 +708,7 @@ footer a:hover {
 
 @media print {
     body { background-color: white; }
-    header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, #contactModal, .header-controls, footer, .loading-overlay { display: none !important; }
+    header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer, .loading-overlay { display: none !important; }
     .container { box-shadow: none; margin: 0; padding: 0; max-width: 100%; display: block !important; }
     #diagnosisForm { display: none; }
     #reportSection { display: block !important; }
