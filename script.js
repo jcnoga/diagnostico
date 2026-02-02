@@ -838,6 +838,8 @@ async function fillDemoData() {
     // 1. Dados Completos e Realistas de Pequeno Comércio
     const demoData = {
         empresa_nome: "Loja Modelo & Estilo",
+        empresa_email_contato: "contato@lojamodelo.com.br", // <-- DADO ADICIONADO
+        empresa_whatsapp: "(11) 98765-4321", // <-- DADO ADICIONADO
         empresa_cnpj: "12.345.678/0001-90",
         empresa_segmento: "Comércio Varejista de Roupas",
         empresa_tempo: "5",
