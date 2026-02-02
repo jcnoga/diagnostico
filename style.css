@@ -31,14 +31,6 @@ body {
     flex-direction: column;
 }
 
-/* --- DESTAQUE DE CAMPOS (NOVO) --- */
-input:focus, select:focus, textarea:focus {
-    border-color: var(--secondary-color) !important;
-    box-shadow: 0 0 8px rgba(233, 69, 96, 0.3) !important;
-    background-color: #fff8f8;
-    outline: none;
-}
-
 /* --- AUTH SCREEN STYLES --- */
 #authScreen {
     position: fixed;
@@ -156,7 +148,7 @@ input:focus, select:focus, textarea:focus {
     height: 100%;
     background-color: var(--lock-bg);
     z-index: 3000;
-    display: none;
+    display: none; /* Controlado via JS */
     justify-content: center;
     align-items: center;
     color: white;
@@ -317,7 +309,7 @@ header h1 {
     padding: 30px;
     border-radius: var(--border-radius);
     box-shadow: 0 0 20px rgba(0,0,0,0.05);
-    display: none; 
+    display: none; /* Escondido até login */
     flex: 1;
 }
 
@@ -422,6 +414,7 @@ input[type="number"],
 input[type="email"],
 input[type="password"],
 input[type="date"],
+input[type="tel"], /* Adicionado para WhatsApp */
 select,
 textarea {
     width: 100%;
@@ -430,6 +423,12 @@ textarea {
     border-radius: var(--border-radius);
     font-size: 1rem;
     transition: var(--transition);
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 5px rgba(15, 52, 96, 0.2);
 }
 
 textarea {
@@ -591,7 +590,7 @@ button:disabled {
     margin-bottom: 15px;
     border-left: 4px solid var(--secondary-color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    white-space: pre-line;
+    white-space: pre-line; /* Permite quebras de linha */
 }
 
 .advice-card h4 {
@@ -633,7 +632,7 @@ button:disabled {
 .btn-ai {
     background-color: #8e44ad;
     color: white;
-    display: none; 
+    display: none; /* Oculto por padrão, só aparece para Admin */
     align-items: center;
     gap: 8px;
 }
@@ -651,9 +650,8 @@ button:disabled {
 /* Spinner */
 .loading-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85); /* Escureci para ler o texto branco melhor */
+    background: rgba(255,255,255,0.7);
     display: none; justify-content: center; align-items: center; z-index: 9999;
-    flex-direction: column;
 }
 .spinner {
     border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color);
@@ -697,6 +695,31 @@ footer a:hover {
     padding-left: 35px;
 }
 
+
+/* [[[[[ NOVOS ESTILOS PARA O MODAL DE CONTATO ]]]]] */
+#contactModal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 2600; /* Z-index maior para ficar sobre outros modais */
+    display: none; /* Começa escondido */
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+#contactModal .settings-card {
+    max-width: 450px;
+    text-align: center;
+}
+
+#contactModal label {
+    text-align: left; /* Alinha labels à esquerda dentro do modal */
+    display: block;
+}
+/* [[[[[ FIM DOS NOVOS ESTILOS ]]]]] */
+
+
 @media (max-width: 600px) {
     .container { margin: 10px; padding: 15px; }
     .radio-group { flex-direction: column; gap: 5px; }
@@ -705,12 +728,12 @@ footer a:hover {
     .step-header { flex-direction: column; align-items: flex-start; }
     .auth-card { padding: 20px; }
     .header-controls { position: relative; top: 0; right: 0; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
-    .cloud-status { display: none; }
+    .cloud-status { display: none; } /* Economizar espaço mobile */
 }
 
 @media print {
     body { background-color: white; }
-    header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, .header-controls, footer, .loading-overlay { display: none !important; }
+    header, .progress-container, .nav-buttons, .action-bar, .help-icon, .btn-demo, #authScreen, .logout-btn, #lockScreen, #settingsModal, #contactModal, .header-controls, footer, .loading-overlay { display: none !important; }
     .container { box-shadow: none; margin: 0; padding: 0; max-width: 100%; display: block !important; }
     #diagnosisForm { display: none; }
     #reportSection { display: block !important; }
